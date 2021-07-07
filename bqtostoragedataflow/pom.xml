@@ -5,7 +5,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.epam.ec.chicagotaximl</groupId>
-  <artifactId>chixi</artifactId>
+  <artifactId>chicago-taxi-ml</artifactId>
   <version>0</version>
 
   <name>chicago-taxi-ml-demo-1</name>

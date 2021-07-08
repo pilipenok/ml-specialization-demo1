@@ -8,4 +8,4 @@ update:
 	tfx pipeline update --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
     
 run:
-	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint={ENDPOINT}
+	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint=${ENDPOINT}

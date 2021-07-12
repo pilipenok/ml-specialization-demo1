@@ -7,5 +7,5 @@ PIPELINE_NAME ?= tfx-pipeline
 update:
 	tfx pipeline update --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
     
-run:
+run: update
 	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint=${ENDPOINT}

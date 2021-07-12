@@ -49,6 +49,8 @@ from ml_metadata.proto import metadata_store_pb2
 
 from pipeline import configs
 
+import pandas as pd
+
 
 def create_pipeline(
     pipeline_name: Text,
@@ -65,6 +67,9 @@ def create_pipeline(
     """Implements the chicago taxi pipeline with TFX."""
 
     components = []
+    
+    # fix csv formats
+    # pd.read_csv().to_csv()
 
     # Brings data into the pipeline or otherwise joins/converts training data.
     example_gen = CsvExampleGen(input_base=data_path)
@@ -88,7 +93,7 @@ def create_pipeline(
         statistics=statistics_gen.outputs['statistics'], 
         schema=schema_gen.outputs['schema']
     )
-    # components.append(example_validator)
+    components.append(example_validator)
 
     # Performs transformations and feature engineering in training and serving.
     transform = Transform(
@@ -100,6 +105,7 @@ def create_pipeline(
         
     trainer = Trainer(
         run_fn=run_fn,
+        #examples=example_gen.outputs['examples'],
         transformed_examples=transform.outputs['transformed_examples'],
         schema=schema_gen.outputs['schema'],
         transform_graph=transform.outputs['transform_graph'],

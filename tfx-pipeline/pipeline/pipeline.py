@@ -64,7 +64,7 @@ def create_pipeline(
 
     components = []
 
-    _fix_csv(data_path)
+    data_path = _fix_csv(data_path)
 
     # Brings data into the pipeline or otherwise joins/converts training data.
     example_gen = CsvExampleGen(input_base=data_path)
@@ -170,8 +170,15 @@ def _fix_csv(data_path):
 
     bucket = storage.Bucket.from_string(data_path, client=storage.Client())
     prefix = data_path.replace(f"gs://{bucket.name}/", '')
+    
+    data_path_fixed = data_path + "fixed/"
     for blob in bucket.list_blobs(prefix=prefix):
         if blob.name == prefix:
             continue
 
-        pd.read_csv(f"gs://{bucket.name}/{blob.name}").to_csv(f"gs://{bucket.name}/fixed/{blob.name}")
+        path_from = f"gs://{bucket.name}/{blob.name}"
+        path_to = path_from.replace(data_path, data_path_fixed)
+        
+        pd.read_csv(path_from).to_csv(path_to)
+        
+    return data_path_fixed

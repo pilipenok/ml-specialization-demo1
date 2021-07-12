@@ -37,7 +37,6 @@ from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
-from tfx.extensions.google_cloud_big_query.example_gen import component as big_query_example_gen_component  # pylint: disable=unused-import
 from tfx.orchestration import pipeline
 from tfx.proto import pusher_pb2
 from tfx.proto import trainer_pb2
@@ -48,9 +47,6 @@ from tfx.types.standard_artifacts import ModelBlessing
 from ml_metadata.proto import metadata_store_pb2
 
 from pipeline import configs
-
-import pandas as pd
-
 
 def create_pipeline(
     pipeline_name: Text,
@@ -67,9 +63,8 @@ def create_pipeline(
     """Implements the chicago taxi pipeline with TFX."""
 
     components = []
-    
-    # fix csv formats
-    # pd.read_csv().to_csv()
+
+    _fix_csv(data_path)
 
     # Brings data into the pipeline or otherwise joins/converts training data.
     example_gen = CsvExampleGen(input_base=data_path)
@@ -167,3 +162,16 @@ def create_pipeline(
         enable_cache=True,
         metadata_connection_config=metadata_connection_config,
     )
+
+# TODO: replace with custom csv_example executor
+def _fix_csv(data_path):
+    import pandas as pd
+    from google.cloud import storage
+
+    bucket = storage.Bucket.from_string(data_path, client=storage.Client())
+    prefix = data_path.replace(f"gs://{bucket.name}/", '')
+    for blob in bucket.list_blobs(prefix=prefix):
+        if blob.name == prefix:
+            continue
+
+        pd.read_csv(f"gs://{bucket.name}/{blob.name}").to_csv(f"gs://{bucket.name}/fixed/{blob.name}")

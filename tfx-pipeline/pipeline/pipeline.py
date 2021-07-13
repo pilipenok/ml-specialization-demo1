@@ -88,7 +88,7 @@ def create_pipeline(
         statistics=statistics_gen.outputs['statistics'], 
         schema=schema_gen.outputs['schema']
     )
-    components.append(example_validator)
+    # components.append(example_validator)
 
     # Performs transformations and feature engineering in training and serving.
     transform = Transform(
@@ -172,6 +172,9 @@ def _fix_csv(data_path):
     prefix = data_path.replace(f"gs://{bucket.name}/", '')
     
     data_path_fixed = data_path + "fixed/"
+    prefix_fixed = data_path_fixed.replace(f"gs://{bucket.name}/", '')
+    bucket.delete_blobs(list(bucket.list_blobs(prefix=prefix_fixed)))
+        
     for blob in bucket.list_blobs(prefix=prefix):
         if blob.name == prefix:
             continue

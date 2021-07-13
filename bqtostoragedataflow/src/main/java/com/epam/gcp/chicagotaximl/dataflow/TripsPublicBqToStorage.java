@@ -10,16 +10,31 @@ import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.PipelineResult;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead;
-import org.apache.beam.sdk.options.*;
+import org.apache.beam.sdk.options.Default;
+import org.apache.beam.sdk.options.Description;
+import org.apache.beam.sdk.options.PipelineOptions;
+import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.options.ValueProvider;
+import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.Mean;
+import org.apache.beam.sdk.transforms.SerializableFunction;
+import org.apache.beam.sdk.transforms.SimpleFunction;
+import org.apache.beam.sdk.transforms.WithKeys;
+import org.apache.beam.sdk.transforms.join.CoGbkResult;
+import org.apache.beam.sdk.transforms.join.CoGroupByKey;
+import org.apache.beam.sdk.transforms.join.KeyedPCollectionTuple;
+import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.TypeDescriptors;
 import org.apache.commons.lang.StringEscapeUtils;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -30,50 +45,190 @@ import java.util.List;
  */
 public class TripsPublicBqToStorage {
 
-    private static final String SRC_KEY_COLUMN = "unique_key";
-    private static final String SRC_PICKUP_LATITUDE_COLUMN = "pickup_latitude";
     private static final String DST_KEY_COLUMN = "unique_key";
 
-    private static final TableSchema DST_SCHEMA = new TableSchema().setFields(List.of(
-                    new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED")));
+    private static final TableSchema TAXI_ID_SCHEMA = new TableSchema().setFields(List.of(
+            new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED")));
+
+    private static String CSV_HEADER =  "pickup_community_area," +
+                                        "day_of_week," +
+                                        "is_us_holiday," +
+                                        "month," +
+                                        "hour_of_day," +
+                                        "am_pm," +
+                                        "avg_fare_per_trip," +
+                                        "number_of_trips";
 
     public static void main(String[] args) {
         Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
 
         Pipeline p = Pipeline.create(options);
 
-        PCollection<TableRow> rows = p.apply("Reading from BigQuery",
-                    BigQueryIO.readTableRows()
-                    .fromQuery(makeQuery(options))
-                    .usingStandardSql()
-                    .withMethod(TypedRead.Method.DIRECT_READ)
-                    .withTemplateCompatibility()
-                    .withoutValidation());
+        PCollection<TableRow> rows = p.apply(
+                "Reading from BigQuery",
+                BigQueryIO.readTableRows()
+                        .fromQuery(makeQuery(options))
+                        .usingStandardSql()
+                        .withMethod(TypedRead.Method.DIRECT_READ)
+                        .withTemplateCompatibility()
+                        .withoutValidation());
 
-        rows.apply("Writing to BigQuery",
-                BigQueryIO.<TableRow>write()
-                        .withFormatFunction(v -> (new TableRow().set(DST_KEY_COLUMN, v.get(SRC_KEY_COLUMN))))
+        PCollection<Trip> trips = rows.apply(
+                "Converting",
+                MapElements.via(new TableRowToTripConverter()));
+
+        trips.apply(
+                "Writing to BigQuery",
+                BigQueryIO.<Trip>write()
+                        .withFormatFunction(new TripToTaxiIdTableRowConverter())
                         .to(StringEscapeUtils.escapeSql(options.getDestinationTable().get()))
-                        .withSchema(DST_SCHEMA)
+                        .withSchema(TAXI_ID_SCHEMA)
                         .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_NEVER)
                         .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
                         .withMethod(BigQueryIO.Write.Method.DEFAULT));
 
-        PCollection<String> csv = rows.apply("Converting to CSV format",
-                MapElements.into(TypeDescriptors.strings())
-                        .via(v -> (String.format("%s,%s", v.get(SRC_KEY_COLUMN), v.get(SRC_PICKUP_LATITUDE_COLUMN)))));
+        PCollection<KV<String, Trip>> tripsByKey = trips.apply(
+                "Grouping an elements",
+                WithKeys.of(TripsPublicBqToStorage::makeAreaHourGroupingKey).withKeyType(TypeDescriptors.strings()));
+
+        PCollection<KV<String, Double>> averageFares = tripsByKey
+                .apply("Grouping a fares",
+                        MapElements.via(
+                                new SimpleFunction<KV<String, Trip>, KV<String, Double>>() {
+                                    @Override
+                                    public KV<String, Double> apply(KV<String, Trip> r) {
+                                        return KV.of(r.getKey(), r.getValue().getFare());
+                                    }
+                                }))
+                .apply("Calculating an average fare", Mean.perKey());
+
+        PCollection<KV<String, Long>> counts = tripsByKey.apply("Counting a number of trips", Count.perKey());
+
+        final TupleTag<Trip> tripsTag = new TupleTag<>();
+        final TupleTag<Long> countsTag = new TupleTag<>();
+        final TupleTag<Double> averagesTag = new TupleTag<>();
+
+        PCollection<KV<String, CoGbkResult>> joined = KeyedPCollectionTuple
+                .of(tripsTag, tripsByKey)
+                .and(countsTag, counts)
+                .and(averagesTag, averageFares)
+                .apply("Joining data", CoGroupByKey.create());
+
+        PCollection<AreaTripsData> tripData = joined.apply(
+                "Constructing TripData",
+                MapElements.via(new SimpleFunction<KV<String, CoGbkResult>, AreaTripsData>() {
+                    @Override
+                    public AreaTripsData apply(KV<String, CoGbkResult> e) {
+                        CoGbkResult result = e.getValue();
+                        long count = result.getOnly(countsTag);
+                        double avg = result.getOnly(averagesTag);
+                        Trip sampleTrip = result.getAll(tripsTag).iterator().next();
+                        return createAreaTripsData(
+                                sampleTrip.getPickupArea(),
+                                sampleTrip.getTripStartHour(),
+                                count, avg,
+                                sampleTrip.isUsHoliday());
+                    }
+                }));
+
+        PCollection<String> csv = tripData.apply(
+                "Converting to CSV format",
+                MapElements.via(new AreaTripsDataToCsvConverter()));
 
         csv.apply("Saving CSV files",
                 TextIO.write()
                         .to(String.format("%s/trips", options.getOutputDirectory()))
+                        .withHeader(CSV_HEADER)
                         .withSuffix(".csv"));
 
-        PipelineResult run = p.run();
+        p.run();
+    }
 
-        if (!options.getRunner().equals(PipelineOptions.DirectRunner.class)) {
-            // waitUntilFinish() is not supported by local runner
-            run.waitUntilFinish();
+    /**
+     * Creates BigQuery's TableRow object for inserting into the table taxi_id.
+     */
+    static class TripToTaxiIdTableRowConverter implements SerializableFunction<Trip, TableRow> {
+
+        @Override
+        public TableRow apply(Trip trip) {
+            return new TableRow().set(DST_KEY_COLUMN, trip.getUniqueKey());
         }
+    }
+
+    /**
+     * Converts an AreaTripsData object into a CSV line.
+     */
+    static class AreaTripsDataToCsvConverter extends SimpleFunction<AreaTripsData, String> {
+
+        @Override
+        public String apply(AreaTripsData v) {
+            return String.format("%s,%s,%s,%s,%s,%s,%s,%s",
+                    v.getPickupCommunityArea(),
+                    v.getDayOfWeek(),
+                    v.isUsHoliday(),
+                    v.getMonth(),
+                    v.getHourOfDay(),
+                    v.getAmPm(),
+                    v.getAverageFare(),
+                    v.getNumberOfTrips());
+        }
+    }
+
+    /**
+     * Converts BigQuery's TableRow object into a Trip object.
+     */
+    static class TableRowToTripConverter extends SimpleFunction<TableRow, Trip> {
+        @Override
+        public Trip apply(TableRow r) {
+            Trip trip = new Trip((String) r.get("unique_key"));
+            trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
+            trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
+            trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));
+            trip.setPickupLongitude(Double.valueOf(String.valueOf(r.get("pickup_longitude"))));
+            trip.setFare(Double.valueOf(String.valueOf(r.get("fare"))));
+            trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
+            return trip;
+        }
+    }
+
+    /**
+     * Constructs AreaTripsData object.
+     * @param count Number of trips in this area at a given hour.
+     * @param averageFare Average fare in this area at a given hour.
+     */
+    private static AreaTripsData createAreaTripsData(
+            int communityArea, LocalDateTime dateTime, long count, double averageFare, boolean isUsHoliday) {
+        AreaTripsData tripData = new AreaTripsData();
+        tripData.setPickupCommunityArea(communityArea);
+        tripData.setNumberOfTrips(count);
+        tripData.setAverageFare(averageFare);
+        tripData.setMonth(dateTime.getMonthValue());
+        tripData.setDayOfWeek(dateTime.getDayOfWeek().getValue());
+        tripData.setHourOfDay(Integer.valueOf(dateTime.format(DateTimeFormatter.ofPattern("h"))));
+        tripData.setUsHoliday(isUsHoliday);
+        tripData.setAmPm(dateTime.format(DateTimeFormatter.ofPattern("a")));
+        return tripData;
+    }
+
+    /**
+     * Converts BigQuery's TableRow object into Trip object.
+     */
+    private static Trip tableRowToTrip(TableRow r) {
+        Trip trip = new Trip((String) r.get("unique_key"));
+        trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
+        trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
+        trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));
+        trip.setPickupLongitude(Double.valueOf(String.valueOf(r.get("pickup_longitude"))));
+        trip.setFare(Double.valueOf(String.valueOf(r.get("fare"))));
+        trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
+        return trip;
+    }
+
+    /**
+     * Creates a grouping key by the pickup area and pickup hour.
+     */
+    private static String makeAreaHourGroupingKey(Trip trip) {
+        return String.format("%d_%s", trip.getPickupArea(), trip.getTripStartHour().toString());
     }
 
     /**
@@ -89,7 +244,7 @@ public class TripsPublicBqToStorage {
 
 
         @Description("The BigQuery source table.")
-        @Default.String("bigquery-public-data.chicago_taxi_trips.taxi_trips")
+        @Default.String("chicago_taxi_ml_demo_1.taxi_trips_view")
         ValueProvider<String> getSourceTable();
 
         void setSourceTable(ValueProvider<String> sourceTable);
@@ -117,15 +272,33 @@ public class TripsPublicBqToStorage {
     }
 
     private static String makeQuery(Options options) {
-        return String.format("SELECT unique_key, pickup_latitude " +
-                                "FROM %s " +
-                                "WHERE trip_start_timestamp > TIMESTAMP_SUB(current_timestamp(), INTERVAL %d DAY) " +
-                                "AND unique_key NOT IN " +
-                                "   (SELECT unique_key FROM %s) " +
-                                "LIMIT %d",
+        return String.format(
+                "SELECT t.unique_key, " +
+                    "DATETIME(TIMESTAMP_TRUNC(t.trip_start_timestamp, HOUR)) AS trip_start_hour, " +
+                    "t.pickup_latitude, " +
+                    "t.pickup_longitude, " +
+                    "t.pickup_community_area, " +
+                    "IF (h.countryRegionCode IS NULL, false, true) AS is_us_holiday, " +
+                    "t.fare " +
+                "FROM %s t " +
+                "LEFT JOIN chicago_taxi_ml_demo_1.national_holidays h " +
+                    "ON TIMESTAMP_TRUNC(t.trip_start_timestamp, DAY) = TIMESTAMP_TRUNC(h.date, DAY) " +
+                    "AND h.countryRegionCode = 'US' " +
+                "WHERE trip_start_timestamp > TIMESTAMP_SUB(current_timestamp(), INTERVAL %d DAY) " +
+                "AND t.trip_start_timestamp IS NOT NULL " +
+                "AND t.trip_end_timestamp IS NOT NULL " +
+                "AND t.pickup_latitude IS NOT NULL " +
+                "AND t.pickup_longitude IS NOT NULL " +
+                "AND t.pickup_community_area IS NOT NULL " +
+                "AND t.fare IS NOT NULL " +
+                "AND t.trip_start_timestamp < t.trip_end_timestamp " +
+                "AND t.unique_key NOT IN " +
+                    "(SELECT unique_key FROM %s) " +
+                "LIMIT %d",
                 StringEscapeUtils.escapeSql(options.getSourceTable().get()),
                 options.getInterval().get(),
                 StringEscapeUtils.escapeSql(options.getDestinationTable().get()),
-                options.getLimit().get());
+                options.getLimit().get()
+        );
     }
 }

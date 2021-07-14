@@ -9,6 +9,7 @@ package com.epam.gcp.chicagotaximl.dataflow;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
@@ -94,9 +95,9 @@ public class TripsPublicBqToStorage {
         PCollection<KV<String, Double>> averageFares = tripsByKey
                 .apply("Grouping a fares",
                         MapElements.via(
-                                new SimpleFunction<KV<String, Trip>, KV<String, Double>>() {
+                                new SimpleFunction<KV<String, Trip>, KV<String, Float>>() {
                                     @Override
-                                    public KV<String, Double> apply(KV<String, Trip> r) {
+                                    public KV<String, Float> apply(KV<String, Trip> r) {
                                         return KV.of(r.getKey(), r.getValue().getFare());
                                     }
                                 }))
@@ -126,7 +127,8 @@ public class TripsPublicBqToStorage {
                         return createAreaTripsData(
                                 sampleTrip.getPickupArea(),
                                 sampleTrip.getTripStartHour(),
-                                count, avg,
+                                count,
+                                roundAverageFare(avg),
                                 sampleTrip.isUsHoliday());
                     }
                 }));
@@ -144,6 +146,11 @@ public class TripsPublicBqToStorage {
         p.run();
     }
 
+    @VisibleForTesting
+    static double roundAverageFare(double avg) {
+        return Math.round(avg * 100) / 100d;
+    }
+
     /**
      * Creates BigQuery's TableRow object for inserting into the table taxi_id.
      */
@@ -158,6 +165,7 @@ public class TripsPublicBqToStorage {
     /**
      * Converts an AreaTripsData object into a CSV line.
      */
+    @VisibleForTesting
     static class AreaTripsDataToCsvConverter extends SimpleFunction<AreaTripsData, String> {
 
         @Override
@@ -177,6 +185,7 @@ public class TripsPublicBqToStorage {
     /**
      * Converts BigQuery's TableRow object into a Trip object.
      */
+    @VisibleForTesting
     static class TableRowToTripConverter extends SimpleFunction<TableRow, Trip> {
         @Override
         public Trip apply(TableRow r) {
@@ -185,7 +194,7 @@ public class TripsPublicBqToStorage {
             trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
             trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));
             trip.setPickupLongitude(Double.valueOf(String.valueOf(r.get("pickup_longitude"))));
-            trip.setFare(Double.valueOf(String.valueOf(r.get("fare"))));
+            trip.setFare(Float.valueOf(String.valueOf(r.get("fare"))));
             trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
             return trip;
         }
@@ -211,23 +220,10 @@ public class TripsPublicBqToStorage {
     }
 
     /**
-     * Converts BigQuery's TableRow object into Trip object.
-     */
-    private static Trip tableRowToTrip(TableRow r) {
-        Trip trip = new Trip((String) r.get("unique_key"));
-        trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
-        trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
-        trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));
-        trip.setPickupLongitude(Double.valueOf(String.valueOf(r.get("pickup_longitude"))));
-        trip.setFare(Double.valueOf(String.valueOf(r.get("fare"))));
-        trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
-        return trip;
-    }
-
-    /**
      * Creates a grouping key by the pickup area and pickup hour.
      */
-    private static String makeAreaHourGroupingKey(Trip trip) {
+    @VisibleForTesting
+    static String makeAreaHourGroupingKey(Trip trip) {
         return String.format("%d_%s", trip.getPickupArea(), trip.getTripStartHour().toString());
     }
 

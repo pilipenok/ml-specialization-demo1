@@ -26,7 +26,7 @@ public class Trip implements Serializable {
     private Double pickupLongitude;
     private Integer pickupArea;
     private boolean isUsHoliday;
-    private Double fare;
+    private Float fare;
 
     public Trip(String uniqueKey) {
         this.uniqueKey = uniqueKey;

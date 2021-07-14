@@ -15,6 +15,8 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +26,7 @@ import static com.google.common.truth.Truth.assertThat;
 /**
  * Integration test for {@link StorageCleaning}. Access to Cloud Storage is required.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class StorageCleaningTest {
 
     private static final String TEST_BUCKET = "chicago-taxi-ml-demo-1-test";

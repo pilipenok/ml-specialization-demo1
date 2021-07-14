@@ -9,10 +9,15 @@ package com.epam.gcp.chicagotaximl.dataflow;
 
 import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.AreaTripsDataToCsvConverter;
 import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.TableRowToTripConverter;
-import com.google.api.services.bigquery.model.TableRow;
+import com.google.api.services.bigquery.model.TableSchema;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -56,17 +61,19 @@ class TripsPublicBqToStorageTest {
 
     @Test
     public void testTableRowToTripConverter() {
-        TableRow row = new TableRow();
-        row.set("unique_key", "saaa");
-        row.set("trip_start_hour", "2021-05-10T19:00");
-        row.set("pickup_latitude", "41.11111111");
-        row.set("pickup_longitude", "-87.454545");
-        row.set("pickup_community_area", "77");
-        row.set("is_us_holiday", "false");
-        row.set("fare", "25.99");
+        TestRecord record = new TestRecord();
+        record.put("unique_key", "saaa");
+        record.put("trip_start_hour", "2021-05-10T19:00");
+        record.put("pickup_latitude", "41.11111111");
+        record.put("pickup_longitude", "-87.454545");
+        record.put("pickup_community_area", "77");
+        record.put("is_us_holiday", "false");
+        record.put("fare", "25.99");
 
+        SchemaAndRecord schemaAndRecord = new SchemaAndRecord(record, new TableSchema());
         TableRowToTripConverter converter = new TableRowToTripConverter();
-        Trip trip = converter.apply(row);
+
+        Trip trip = converter.apply(schemaAndRecord);
 
         assertThat(trip.getUniqueKey()).isEqualTo("saaa");
         assertThat(trip.getTripStartHour()).isEqualTo(LocalDateTime.of(2021, 5, 10, 19, 0));
@@ -75,5 +82,48 @@ class TripsPublicBqToStorageTest {
         assertThat(trip.getPickupArea()).isEqualTo(77);
         assertThat(trip.isUsHoliday()).isFalse();
         assertThat(trip.getFare()).isEqualTo(25.99f);
+    }
+
+    private static class TestRecord implements GenericRecord {
+
+        private Map<String, Object> m = new HashMap<>();
+
+        @Override
+        public void put(String key, Object v) {
+            m.put(key, v);
+        }
+
+        @Override
+        public Object get(String key) {
+            return m.get(key);
+        }
+
+        @Override
+        public void put(int i, Object v) {
+            // not in use
+        }
+
+        @Override
+        public Object get(int i) { // not in use
+            return null;
+        }
+
+        @Override
+        public Schema getSchema() { // not in use
+            return null;
+        }
+    }
+
+    @Test
+    public void testCreateAreaTripsData() {
+        AreaTripsData areaTripsData = TripsPublicBqToStorage
+                .createAreaTripsData(77, LocalDateTime.of(2021, 5, 8, 13, 0), 100, 30.12345, true);
+        assertThat(areaTripsData.getAmPm()).isEqualTo("PM");
+        assertThat(areaTripsData.getNumberOfTrips()).isEqualTo(100);
+        assertThat(areaTripsData.getAverageFare()).isEqualTo(30.12345);
+        assertThat(areaTripsData.getDayOfWeek()).isEqualTo(6);
+        assertThat(areaTripsData.getMonth()).isEqualTo(5);
+        assertThat(areaTripsData.getHourOfDay()).isEqualTo(1);
+        assertThat(areaTripsData.getPickupCommunityArea()).isEqualTo(77);
     }
 }

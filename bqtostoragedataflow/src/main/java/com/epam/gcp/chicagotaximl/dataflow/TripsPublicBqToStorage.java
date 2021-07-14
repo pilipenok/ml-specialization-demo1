@@ -10,10 +10,12 @@ import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
-import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead;
+import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead.Method;
+import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -65,18 +67,14 @@ public class TripsPublicBqToStorage {
 
         Pipeline p = Pipeline.create(options);
 
-        PCollection<TableRow> rows = p.apply(
-                "Reading from BigQuery",
-                BigQueryIO.readTableRows()
+        PCollection<Trip> trips = p.apply(
+                        "Reading from BigQuery",
+                        BigQueryIO.read(new TableRowToTripConverter())
                         .fromQuery(makeQuery(options))
                         .usingStandardSql()
-                        .withMethod(TypedRead.Method.DIRECT_READ)
+                        .withMethod(Method.DIRECT_READ)
                         .withTemplateCompatibility()
                         .withoutValidation());
-
-        PCollection<Trip> trips = rows.apply(
-                "Converting",
-                MapElements.via(new TableRowToTripConverter()));
 
         trips.apply(
                 "Writing to BigQuery",
@@ -186,9 +184,10 @@ public class TripsPublicBqToStorage {
      * Converts BigQuery's TableRow object into a Trip object.
      */
     @VisibleForTesting
-    static class TableRowToTripConverter extends SimpleFunction<TableRow, Trip> {
+    static class TableRowToTripConverter implements SerializableFunction<SchemaAndRecord, Trip> {
         @Override
-        public Trip apply(TableRow r) {
+        public Trip apply(SchemaAndRecord schemaAndRecord) {
+            GenericRecord r = schemaAndRecord.getRecord();
             Trip trip = new Trip((String) r.get("unique_key"));
             trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
             trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
@@ -205,7 +204,8 @@ public class TripsPublicBqToStorage {
      * @param count Number of trips in this area at a given hour.
      * @param averageFare Average fare in this area at a given hour.
      */
-    private static AreaTripsData createAreaTripsData(
+    @VisibleForTesting
+    static AreaTripsData createAreaTripsData(
             int communityArea, LocalDateTime dateTime, long count, double averageFare, boolean isUsHoliday) {
         AreaTripsData tripData = new AreaTripsData();
         tripData.setPickupCommunityArea(communityArea);
@@ -283,8 +283,8 @@ public class TripsPublicBqToStorage {
                 "WHERE trip_start_timestamp > TIMESTAMP_SUB(current_timestamp(), INTERVAL %d DAY) " +
                 "AND t.trip_start_timestamp IS NOT NULL " +
                 "AND t.trip_end_timestamp IS NOT NULL " +
-                "AND t.pickup_latitude IS NOT NULL " +
-                "AND t.pickup_longitude IS NOT NULL " +
+                //"AND t.pickup_latitude IS NOT NULL " +
+                //"AND t.pickup_longitude IS NOT NULL " +
                 "AND t.pickup_community_area IS NOT NULL " +
                 "AND t.fare IS NOT NULL " +
                 "AND t.trip_start_timestamp < t.trip_end_timestamp " +

@@ -139,8 +139,8 @@ public class TripsPublicBqToStorage {
                 TextIO.write()
                         .to(String.format("%s/trips", options.getOutputDirectory()))
                         .withHeader(CSV_HEADER)
-                        .withSuffix(".csv"));
-
+                        .withSuffix(".csv")
+                        .withoutSharding());
         p.run();
     }
 

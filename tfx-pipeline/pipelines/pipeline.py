@@ -46,28 +46,24 @@ from tfx.types.standard_artifacts import ModelBlessing
 
 from ml_metadata.proto import metadata_store_pb2
 
-from pipeline import configs
+from pipelines import configs
+
 
 def create_pipeline(
     pipeline_name: Text,
     pipeline_root: Text,
-    data_path: Text,
-    preprocessing_fn: Text,
-    run_fn: Text,
-    train_args: trainer_pb2.TrainArgs,
-    eval_args: trainer_pb2.EvalArgs,
-    eval_accuracy_threshold: float,
-    metadata_connection_config: Optional[
-        metadata_store_pb2.ConnectionConfig] = None,
+    metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
     """Implements the chicago taxi pipeline with TFX."""
 
+    train_args = trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS)
+    eval_args  = trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS)
+    eval_accuracy_threshold = configs.EVAL_ACCURACY_THRESHOLD
+
     components = []
 
-    data_path = _fix_csv(data_path)
-
     # Brings data into the pipeline or otherwise joins/converts training data.
-    example_gen = CsvExampleGen(input_base=data_path)
+    example_gen = CsvExampleGen(input_base=configs.DATA_PATH)
     components.append(example_gen)
 
     # Computes statistics over data for visualization and example validation.
@@ -94,12 +90,12 @@ def create_pipeline(
     transform = Transform(
         examples=example_gen.outputs['examples'], 
         schema=schema_gen.outputs['schema'], 
-        preprocessing_fn=preprocessing_fn
+        preprocessing_fn=configs.PREPROCESSING_FN
     )
     components.append(transform)
         
     trainer = Trainer(
-        run_fn=run_fn,
+        run_fn=configs.RUN_FN,
         #examples=example_gen.outputs['examples'],
         transformed_examples=transform.outputs['transformed_examples'],
         schema=schema_gen.outputs['schema'],
@@ -162,26 +158,3 @@ def create_pipeline(
         enable_cache=True,
         metadata_connection_config=metadata_connection_config,
     )
-
-# TODO: replace with custom csv_example executor
-def _fix_csv(data_path):
-    import pandas as pd
-    from google.cloud import storage
-
-    bucket = storage.Bucket.from_string(data_path, client=storage.Client())
-    prefix = data_path.replace(f"gs://{bucket.name}/", '')
-    
-    data_path_fixed = data_path + "fixed/"
-    prefix_fixed = data_path_fixed.replace(f"gs://{bucket.name}/", '')
-    bucket.delete_blobs(list(bucket.list_blobs(prefix=prefix_fixed)))
-        
-    for blob in bucket.list_blobs(prefix=prefix):
-        if blob.name == prefix:
-            continue
-
-        path_from = f"gs://{bucket.name}/{blob.name}"
-        path_to = path_from.replace(data_path, data_path_fixed)
-        
-        pd.read_csv(path_from).to_csv(path_to)
-        
-    return data_path_fixed

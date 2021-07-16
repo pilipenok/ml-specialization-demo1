@@ -283,13 +283,13 @@ public class TripsPublicBqToStorage {
                 "WHERE trip_start_timestamp > TIMESTAMP_SUB(current_timestamp(), INTERVAL %d DAY) " +
                 "AND t.trip_start_timestamp IS NOT NULL " +
                 "AND t.trip_end_timestamp IS NOT NULL " +
-                //"AND t.pickup_latitude IS NOT NULL " +
-                //"AND t.pickup_longitude IS NOT NULL " +
                 "AND t.pickup_community_area IS NOT NULL " +
                 "AND t.fare IS NOT NULL " +
                 "AND t.trip_start_timestamp < t.trip_end_timestamp " +
                 "AND t.unique_key NOT IN " +
                     "(SELECT unique_key FROM %s) " +
+                "AND (SELECT ST_COVERS(b.boundaries, ST_GEOGPOINT(t.pickup_longitude, t.pickup_latitude)) " +
+                    "FROM `chicago_taxi_ml_demo_1.chicago_boundaries` b) = True " +
                 "LIMIT %d",
                 StringEscapeUtils.escapeSql(options.getSourceTable().get()),
                 options.getInterval().get(),

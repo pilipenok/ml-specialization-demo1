@@ -139,8 +139,8 @@ public class TripsPublicBqToStorage {
                 TextIO.write()
                         .to(String.format("%s/trips", options.getOutputDirectory()))
                         .withHeader(CSV_HEADER)
-                        .withSuffix(".csv"));
-
+                        .withSuffix(".csv")
+                        .withoutSharding());
         p.run();
     }
 
@@ -188,7 +188,7 @@ public class TripsPublicBqToStorage {
         @Override
         public Trip apply(SchemaAndRecord schemaAndRecord) {
             GenericRecord r = schemaAndRecord.getRecord();
-            Trip trip = new Trip((String) r.get("unique_key"));
+            Trip trip = new Trip(String.valueOf(r.get("unique_key")));
             trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
             trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
             trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));

@@ -5,8 +5,8 @@ from absl import logging
 import tensorflow as tf
 import tensorflow_transform as tft
 
-from models.keras.baseline import features
-from models.keras.baseline import constants
+from models.keras.baseline_advanced import features
+from models.keras.baseline_advanced import constants
 from tfx_bsl.tfxio import dataset_options
 
 

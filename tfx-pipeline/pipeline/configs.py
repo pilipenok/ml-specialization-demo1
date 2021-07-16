@@ -34,7 +34,7 @@ DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/'
 PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
-RUN_FN = 'models.keras.model.run_fn'
+RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 # RUN_FN = 'models.estimator.model.run_fn'
 
 TRAIN_NUM_STEPS = 1000

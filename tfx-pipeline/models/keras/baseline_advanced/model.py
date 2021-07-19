@@ -51,7 +51,7 @@ def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
       tf_transform_output.transformed_metadata.schema).repeat()
 
 
-def _build_keras_model():
+def _build_keras_model(hidden_units, learning_rate):
   """Creates a DNN Keras model for classifying taxi data.
 
   Args:
@@ -115,9 +115,7 @@ def _build_keras_model():
   model = _wide_and_deep_classifier_advanced(
       wide_columns=wide_columns,
       deep_columns=real_valued_columns,
-      mixed_columns=mixed_columns,
-      dnn_hidden_units=hidden_units,
-      learning_rate=learning_rate)
+      mixed_columns=mixed_columns)
   return model
 
 
@@ -235,7 +233,9 @@ def run_fn(fn_args):
 
   mirrored_strategy = tf.distribute.MirroredStrategy()
   with mirrored_strategy.scope():
-    model = _build_keras_model()
+    model = _build_keras_model(
+        hidden_units=constants.HIDDEN_UNITS,
+        learning_rate=constants.LEARNING_RATE)
 
   # Write logs to path
   tensorboard_callback = tf.keras.callbacks.TensorBoard(

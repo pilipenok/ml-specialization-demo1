@@ -26,9 +26,13 @@ from typing import Text, List
 
 # At least one feature is needed.
 
+# area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,
+# avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city,
+# relative_demand
+
 # Name of features which have continuous float values. These features will be
 # used as their own values.
-DENSE_FLOAT_FEATURE_KEYS = ['avg_fare_per_trip']
+DENSE_FLOAT_FEATURE_KEYS = ['avg_total_per_trip_prev4h_area','avg_total_per_trip_prev4h_city','avg_ntrips_prev_4h_area','avg_ntrips_prev_4h_city']
 
 # Name of features which have continuous float values. These features will be
 # bucketized using `tft.bucketize`, and will be used as categorical features.
@@ -39,13 +43,13 @@ BUCKET_FEATURE_BUCKET_COUNT = []
 
 # Name of features which have categorical values which are mapped to integers.
 # These features will be used as categorical features.
-CATEGORICAL_FEATURE_KEYS = ['pickup_community_area', 'day_of_week', 'month', 'hour_of_day']
+CATEGORICAL_FEATURE_KEYS = ['area','is_holiday','day_of_week','year','month','day','hour24','hour12','day_period']
 # Number of buckets to use integer numbers as categorical features. The length
 # of this list should be the same with CATEGORICAL_FEATURE_KEYS.
-CATEGORICAL_FEATURE_MAX_VALUES = [100, 7, 2, 12, 24, 2]
+CATEGORICAL_FEATURE_MAX_VALUES = [100,2,7,4,12,31,24,12,2]
 
 # Name of features which have string values and are mapped to integers.
-VOCAB_FEATURE_KEYS = ['am_pm','is_us_holiday']
+VOCAB_FEATURE_KEYS = []
 
 # Number of vocabulary terms used for encoding VOCAB_FEATURES by tf.transform
 VOCAB_SIZE = 2
@@ -54,7 +58,7 @@ VOCAB_SIZE = 2
 OOV_SIZE = 10
 
 # Keys
-LABEL_KEY = 'number_of_trips'
+LABEL_KEY = 'relative_demand'
 
 
 def transformed_name(key: Text) -> Text:

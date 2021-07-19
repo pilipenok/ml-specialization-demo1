@@ -64,8 +64,6 @@ def create_pipeline(
 
     components = []
 
-    data_path = _fix_csv(data_path)
-
     # Brings data into the pipeline or otherwise joins/converts training data.
     example_gen = CsvExampleGen(input_base=data_path)
     components.append(example_gen)
@@ -162,26 +160,3 @@ def create_pipeline(
         enable_cache=True,
         metadata_connection_config=metadata_connection_config,
     )
-
-# TODO: replace with custom csv_example executor
-def _fix_csv(data_path):
-    import pandas as pd
-    from google.cloud import storage
-
-    bucket = storage.Bucket.from_string(data_path, client=storage.Client())
-    prefix = data_path.replace(f"gs://{bucket.name}/", '')
-    
-    data_path_fixed = data_path + "fixed/"
-    prefix_fixed = data_path_fixed.replace(f"gs://{bucket.name}/", '')
-    bucket.delete_blobs(list(bucket.list_blobs(prefix=prefix_fixed)))
-        
-    for blob in bucket.list_blobs(prefix=prefix):
-        if blob.name == prefix:
-            continue
-
-        path_from = f"gs://{bucket.name}/{blob.name}"
-        path_to = path_from.replace(data_path, data_path_fixed)
-        
-        pd.read_csv(path_from).to_csv(path_to)
-        
-    return data_path_fixed

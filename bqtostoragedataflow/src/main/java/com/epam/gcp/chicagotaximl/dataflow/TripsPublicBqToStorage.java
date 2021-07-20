@@ -16,6 +16,7 @@ import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead.Method;
 import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
+import org.apache.beam.sdk.io.gcp.bigquery.WriteResult;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
@@ -26,6 +27,7 @@ import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.Mean;
 import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.SimpleFunction;
+import org.apache.beam.sdk.transforms.Wait;
 import org.apache.beam.sdk.transforms.WithKeys;
 import org.apache.beam.sdk.transforms.join.CoGbkResult;
 import org.apache.beam.sdk.transforms.join.CoGroupByKey;
@@ -36,6 +38,7 @@ import org.apache.beam.sdk.values.TupleTag;
 import org.apache.beam.sdk.values.TypeDescriptors;
 import org.apache.commons.lang.StringEscapeUtils;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -49,9 +52,11 @@ import java.util.List;
 public class TripsPublicBqToStorage {
 
     private static final String DST_KEY_COLUMN = "unique_key";
+    private static final String DST_TIMESTAMP_COLUMN = "processed_timestamp";
 
     private static final TableSchema TAXI_ID_SCHEMA = new TableSchema().setFields(List.of(
-            new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED")));
+            new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED"),
+            new TableFieldSchema().setName(DST_TIMESTAMP_COLUMN).setType("TIMESTAMP").setMode("REQUIRED")));
 
     private static String CSV_HEADER =  "pickup_community_area," +
                                         "day_of_week," +
@@ -68,7 +73,7 @@ public class TripsPublicBqToStorage {
         Pipeline p = Pipeline.create(options);
 
         PCollection<Trip> trips = p.apply(
-                        "Reading from BigQuery",
+                        "Reading from BQ",
                         BigQueryIO.read(new TableRowToTripConverter())
                         .fromQuery(makeQuery(options))
                         .usingStandardSql()
@@ -76,8 +81,8 @@ public class TripsPublicBqToStorage {
                         .withTemplateCompatibility()
                         .withoutValidation());
 
-        trips.apply(
-                "Writing to BigQuery",
+        WriteResult taxiIdInsertsResult = trips.apply(
+                "Writing to BQ",
                 BigQueryIO.<Trip>write()
                         .withFormatFunction(new TripToTaxiIdTableRowConverter())
                         .to(StringEscapeUtils.escapeSql(options.getDestinationTable().get()))
@@ -135,12 +140,15 @@ public class TripsPublicBqToStorage {
                 "Converting to CSV format",
                 MapElements.via(new AreaTripsDataToCsvConverter()));
 
-        csv.apply("Saving CSV files",
+        csv.apply("Waiting BQ inserts to finish",
+                Wait.on(taxiIdInsertsResult.getFailedInserts()))
+            .apply("Saving CSV files",
                 TextIO.write()
-                        .to(String.format("%s/trips", options.getOutputDirectory()))
-                        .withHeader(CSV_HEADER)
-                        .withSuffix(".csv")
-                        .withoutSharding());
+                    .to(String.format("%s/trips", options.getOutputDirectory()))
+                    .withHeader(CSV_HEADER)
+                    .withSuffix(".csv")
+                    .withoutSharding());
+
         p.run();
     }
 
@@ -152,11 +160,15 @@ public class TripsPublicBqToStorage {
     /**
      * Creates BigQuery's TableRow object for inserting into the table taxi_id.
      */
-    static class TripToTaxiIdTableRowConverter implements SerializableFunction<Trip, TableRow> {
+    private static class TripToTaxiIdTableRowConverter implements SerializableFunction<Trip, TableRow> {
+
+        private static final String NOW = Instant.now().toString();
 
         @Override
         public TableRow apply(Trip trip) {
-            return new TableRow().set(DST_KEY_COLUMN, trip.getUniqueKey());
+            return new TableRow()
+                    .set(DST_KEY_COLUMN, trip.getUniqueKey())
+                    .set(DST_TIMESTAMP_COLUMN, NOW);
         }
     }
 

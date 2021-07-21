@@ -17,13 +17,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 from absl import logging
 
 from pipeline import configs
 from pipeline import pipeline
 from tfx.orchestration.kubeflow import kubeflow_dag_runner
-from tfx.proto import trainer_pb2
 from tfx.utils import telemetry_utils
 
 
@@ -49,13 +47,7 @@ def run():
     ).run(
         pipeline.create_pipeline(
             pipeline_name=configs.PIPELINE_NAME,
-            pipeline_root=configs.PIPELINE_ROOT,
-            data_path=configs.DATA_PATH,
-            preprocessing_fn=configs.PREPROCESSING_FN,
-            run_fn=configs.RUN_FN,
-            train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
-            eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
-            eval_accuracy_threshold=configs.EVAL_ACCURACY_THRESHOLD,
+            pipeline_root=configs.PIPELINE_ROOT
         )
     )
 

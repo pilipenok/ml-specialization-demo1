@@ -38,7 +38,6 @@ from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
 from tfx.orchestration import pipeline
-from tfx.proto import pusher_pb2
 from tfx.proto import trainer_pb2
 from tfx.types import Channel
 from tfx.types.standard_artifacts import Model
@@ -51,12 +50,6 @@ from pipeline import configs
 def create_pipeline(
     pipeline_name: Text,
     pipeline_root: Text,
-    data_path: Text,
-    preprocessing_fn: Text,
-    run_fn: Text,
-    train_args: trainer_pb2.TrainArgs,
-    eval_args: trainer_pb2.EvalArgs,
-    eval_accuracy_threshold: float,
     metadata_connection_config: Optional[
         metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
@@ -65,7 +58,7 @@ def create_pipeline(
     components = []
 
     # Brings data into the pipeline or otherwise joins/converts training data.
-    example_gen = CsvExampleGen(input_base=data_path)
+    example_gen = CsvExampleGen(input_base=configs.DATA_PATH)
     components.append(example_gen)
 
     # Computes statistics over data for visualization and example validation.
@@ -92,18 +85,18 @@ def create_pipeline(
     transform = Transform(
         examples=example_gen.outputs['examples'], 
         schema=schema_gen.outputs['schema'], 
-        preprocessing_fn=preprocessing_fn
+        preprocessing_fn=configs.PREPROCESSING_FN
     )
     components.append(transform)
         
     trainer = Trainer(
-        run_fn=run_fn,
+        run_fn=configs.RUN_FN,
         #examples=example_gen.outputs['examples'],
         transformed_examples=transform.outputs['transformed_examples'],
         schema=schema_gen.outputs['schema'],
         transform_graph=transform.outputs['transform_graph'],
-        train_args=train_args,
-        eval_args=eval_args,
+        train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
+        eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_trainer_executor.GenericExecutor),
         custom_config={ai_platform_trainer_executor.TRAINING_ARGS_KEY: configs.GCP_AI_PLATFORM_TRAINING_ARGS}
     )
@@ -127,7 +120,7 @@ def create_pipeline(
                 tfma.MetricConfig(
                     class_name='BinaryAccuracy',
                     threshold=tfma.MetricThreshold(
-                        value_threshold=tfma.GenericValueThreshold(lower_bound={'value': eval_accuracy_threshold}),
+                        value_threshold=tfma.GenericValueThreshold(lower_bound={'value': configs.EVAL_ACCURACY_THRESHOLD}),
                         change_threshold=tfma.GenericChangeThreshold(direction=tfma.MetricDirection.HIGHER_IS_BETTER, absolute={'value': -1e-10})
                     )
                 )

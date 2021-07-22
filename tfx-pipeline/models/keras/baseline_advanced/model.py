@@ -55,10 +55,6 @@ def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
 def _build_keras_model():
     """Creates a DNN Keras model for classifying taxi data.
 
-    Args:
-    hidden_units: [int], the layer sizes of the DNN (input layer first).
-    learning_rate: [float], learning rate of the Adam optimizer.
-
     Returns:
     A keras Model.
     """
@@ -84,10 +80,7 @@ def _build_keras_model():
         tf.feature_column.categorical_column_with_identity(t('day_period'), 2),
     ]
 
-    indicator_columns = [
-        tf.feature_column.indicator_column(categorical_column)
-        for categorical_column in categorical_columns
-    ]
+    indicator_columns = [tf.feature_column.indicator_column(column) for column in categorical_columns]
 
     crossed_columns = [
         tf.feature_column.crossed_column(
@@ -114,6 +107,7 @@ def _build_keras_model():
     ]
 
     model = _wide_and_deep_classifier_advanced(
+        inputs=real_valued_columns+wide_columns,
         wide_columns=wide_columns,
         deep_columns=real_valued_columns,
         mixed_columns=mixed_columns
@@ -121,28 +115,20 @@ def _build_keras_model():
     return model
 
 
-def _wide_and_deep_classifier_baseline(wide_columns, deep_columns):
+def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
     input_layers = {
-        colname: tf.keras.layers.Input(name=colname, shape=(), dtype=tf.float32)
-        for colname in features.transformed_names(features.DENSE_FLOAT_FEATURE_KEYS)
+        feature.name: tf.keras.layers.Input(name=t(feature.name), shape=())
+        for feature in inputs
     }
-    input_layers.update({
-        colname: tf.keras.layers.Input(name=colname, shape=(), dtype='int32')
-        for colname in features.transformed_names(features.BUCKET_FEATURE_KEYS)
-    })
-    input_layers.update({
-        colname: tf.keras.layers.Input(name=colname, shape=(), dtype='int32') for
-        colname in features.transformed_names(features.CATEGORICAL_FEATURE_KEYS)
-    })
 
     deep = tf.keras.layers.DenseFeatures(deep_columns)(input_layers)
     for numnodes in constants.HIDDEN_UNITS:
         deep = tf.keras.layers.Dense(numnodes)(deep)
+        
     wide = tf.keras.layers.DenseFeatures(wide_columns)(input_layers)
 
-    output = tf.keras.layers.Dense(
-        1, activation='sigmoid')(
-        tf.keras.layers.concatenate([deep, wide]))
+    output = tf.keras.layers.concatenate([deep, wide])
+    output = tf.keras.layers.Dense(1, activation='sigmoid')(output)
     output = tf.squeeze(output, -1)
 
     model = tf.keras.Model(input_layers, output)
@@ -154,10 +140,10 @@ def _wide_and_deep_classifier_baseline(wide_columns, deep_columns):
     return model
 
 
-def _wide_and_deep_classifier_advanced(wide_columns, deep_columns, mixed_columns):
+def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed_columns):
     input_layers = {
-        feature.name: tf.keras.layers.Input(name=feature.name, shape=(), dtype=feature.dtype)
-        for feature in wide_columns
+        feature.name: tf.keras.layers.Input(name=feature.name, shape=())
+        for feature in inputs
     }
 
     deep = tf.keras.layers.DenseFeatures(deep_columns)(input_layers)
@@ -172,7 +158,8 @@ def _wide_and_deep_classifier_advanced(wide_columns, deep_columns, mixed_columns
     for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
         widesink = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
 
-    output = tf.keras.layers.Dense(1)(tf.keras.layers.concatenate([deep, mix, widesink, wide]))
+    output = tf.keras.layers.concatenate([deep, mix, widesink, wide])
+    output = tf.keras.layers.Dense(1)(output)
     output = tf.squeeze(output, -1)
 
     model = tf.keras.Model(input_layers, output)

@@ -61,16 +61,16 @@ OOV_SIZE = 10
 LABEL_KEY = 'relative_demand'
 
 
-def transformed_name(key: Text) -> Text:
+def transformed_name_(key: Text) -> Text:
   """Generate the name of the transformed feature from original name."""
   return key + '_xf'
 
 
-def vocabulary_name(key: Text) -> Text:
+def vocabulary_name_(key: Text) -> Text:
   """Generate the name of the vocabulary feature from original name."""
   return key + '_vocab'
 
 
-def transformed_names(keys: List[Text]) -> List[Text]:
+def transformed_names_(keys: List[Text]) -> List[Text]:
   """Transform multiple feature names at once."""
   return [transformed_name(key) for key in keys]

@@ -50,39 +50,36 @@ def _fill_in_missing(x):
 
 
 def preprocessing_fn(inputs):
-  """tf.transform's callback function for preprocessing inputs.
+    """tf.transform's callback function for preprocessing inputs.
 
-  Args:
-    inputs: map from feature keys to raw not-yet-transformed features.
+    Args:
+        inputs: map from feature keys to raw not-yet-transformed features.
 
-  Returns:
-    Map from string feature key to transformed feature operations.
-  """
-  outputs = {}
-  for key in features.DENSE_FLOAT_FEATURE_KEYS:
-    # Preserve this feature as a dense float, setting nan's to the mean.
-    outputs[features.transformed_name(key)] = tft.scale_to_z_score(
-        _fill_in_missing(inputs[key]))
+    Returns:
+        Map from string feature key to transformed feature operations.
+    """
+    outputs = {}
+#   for key in features.DENSE_FLOAT_FEATURE_KEYS:
+#     # Preserve this feature as a dense float, setting nan's to the mean.
+#     outputs[key] = tft.scale_to_z_score(
+#         _fill_in_missing(inputs[key]))
 
-  for key in features.VOCAB_FEATURE_KEYS:
-    # Build a vocabulary for this feature.
-    outputs[features.transformed_name(key)] = tft.compute_and_apply_vocabulary(
-        _fill_in_missing(inputs[key]),
-        top_k=features.VOCAB_SIZE,
-        num_oov_buckets=features.OOV_SIZE)
+#   for key in features.VOCAB_FEATURE_KEYS:
+#     # Build a vocabulary for this feature.
+#     outputs[key] = tft.compute_and_apply_vocabulary(_fill_in_missing(inputs[key]),top_k=features.VOCAB_SIZE,num_oov_buckets=features.OOV_SIZE)
 
-  for key, num_buckets in zip(features.BUCKET_FEATURE_KEYS,
-                              features.BUCKET_FEATURE_BUCKET_COUNT):
-    outputs[features.transformed_name(key)] = tft.bucketize(
-        _fill_in_missing(inputs[key]),
-        num_buckets)
+#   for key, num_buckets in zip(features.BUCKET_FEATURE_KEYS,
+#                               features.BUCKET_FEATURE_BUCKET_COUNT):
+#     outputs[key] = tft.bucketize(_fill_in_missing(inputs[key]), num_buckets)
 
-  for key in features.CATEGORICAL_FEATURE_KEYS:
-    outputs[features.transformed_name(key)] = _fill_in_missing(inputs[key])
+#   for key in features.CATEGORICAL_FEATURE_KEYS:
+#     outputs[features.transformed_name(key)] = _fill_in_missing(inputs[key])
+    
+    for key in inputs:
+        outputs[key] = _fill_in_missing(inputs[key])
 
   # TODO(b/157064428): Support label transformation for Keras.
   # Do not apply label transformation as it will result in wrong evaluation.
-  outputs[features.transformed_name(
-      features.LABEL_KEY)] = inputs[features.LABEL_KEY]
+    outputs['relative_demand'] = inputs['relative_demand']
 
-  return outputs
+    return outputs

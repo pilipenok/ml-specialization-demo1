@@ -46,10 +46,9 @@ def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
     """
     return data_accessor.tf_dataset_factory(
         file_pattern,
-        dataset_options.TensorFlowDatasetOptions(
-            batch_size=batch_size,
-            label_key=t('relative_demand')),
-        tf_transform_output.transformed_metadata.schema).repeat()
+        dataset_options.TensorFlowDatasetOptions(batch_size=batch_size,label_key='relative_demand'),
+        tf_transform_output.transformed_metadata.schema
+    ).repeat()
 
 
 def _build_keras_model():
@@ -60,22 +59,36 @@ def _build_keras_model():
     """
 
     # Data Input
+#     sparse = dict(
+#         avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_identity('avg_total_per_trip_prev4h_area', 5),
+#         avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_identity('avg_total_per_trip_prev4h_city', 5),
+#         avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_identity('avg_ntrips_prev_4h_area', 100),
+#         avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_identity('avg_ntrips_prev_4h_city', 100),
+#         hour24=tf.feature_column.categorical_column_with_identity('hour24', 4),
+#         area=tf.feature_column.categorical_column_with_identity('area', 77),
+#         is_holiday=tf.feature_column.categorical_column_with_identity('is_holiday', 2),
+#         day_of_week=tf.feature_column.categorical_column_with_identity('day_of_week', 7),
+#         month=tf.feature_column.categorical_column_with_identity('month', 12),
+#         day=tf.feature_column.categorical_column_with_identity('day', 31),
+#         hour12=tf.feature_column.categorical_column_with_identity('hour12', 12),
+#         day_period=tf.feature_column.categorical_column_with_identity('day_period', 2)
+#     )
+    
     sparse = dict(
-        avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_identity(
-            t('avg_total_per_trip_prev4h_area'), 5),
-        avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_identity(
-            t('avg_total_per_trip_prev4h_city'), 5),
-        avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_area'), 100),
-        avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_city'), 100),
-        hour24=tf.feature_column.categorical_column_with_identity(t('hour24'), 4),
-        area=tf.feature_column.categorical_column_with_identity(t('area'), 77),
-        is_holiday=tf.feature_column.categorical_column_with_identity(t('is_holiday'), 2),
-        day_of_week=tf.feature_column.categorical_column_with_identity(t('day_of_week'), 7),
-        month=tf.feature_column.categorical_column_with_identity(t('month'), 12),
-        day=tf.feature_column.categorical_column_with_identity(t('day'), 31),
-        hour12=tf.feature_column.categorical_column_with_identity(t('hour12'), 12),
-        day_period=tf.feature_column.categorical_column_with_identity(t('day_period'), 2)
+        avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_area', 5),
+        avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_city', 5),
+        avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_ntrips_prev_4h_area', 100),
+        avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_hash_bucket('avg_ntrips_prev_4h_city', 100),
+        hour24=tf.feature_column.categorical_column_with_hash_bucket('hour24', 4),
+        area=tf.feature_column.categorical_column_with_hash_bucket('area', 77),
+        is_holiday=tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false']),
+        day_of_week=tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', list(map(str, range(7)))),
+        month=tf.feature_column.categorical_column_with_vocabulary_list('month', list(map(str, range(12)))),
+        day=tf.feature_column.categorical_column_with_vocabulary_list('day', list(map(str, range(31)))),
+        hour12=tf.feature_column.categorical_column_with_vocabulary_list('hour12', list(map(str, range(12)))),
+        day_period=tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'])
     )
+    
 
     # Categorical Input
     inputs = {
@@ -85,20 +98,8 @@ def _build_keras_model():
 
     # Feature Engineering
     sparse.update(
-        is_holiday_day_of_week=tf.feature_column.crossed_column(
-            [
-                tf.feature_column.categorical_column_with_identity(t('is_holiday'), 2),
-                tf.feature_column.categorical_column_with_identity(t('day_of_week'), 7)
-            ],
-            hash_bucket_size=14
-        ),
-        hour12_day_period=tf.feature_column.crossed_column(
-            [
-                tf.feature_column.categorical_column_with_identity(t('hour12'), 12),
-                tf.feature_column.categorical_column_with_identity(t('day_period'), 2),
-            ],
-            hash_bucket_size=24
-        )
+        is_holiday_day_of_week=tf.feature_column.crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
+        hour12_day_period=tf.feature_column.crossed_column([sparse['hour12'],sparse['day_period']], 12*2)
     )
 
     embed = dict(
@@ -113,38 +114,33 @@ def _build_keras_model():
         for colname, col in sparse.items()
     }
 
-    real_valued_columns = [
-        tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
-        tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
-        tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
-        tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
-    ]
+#     real_valued_columns = [
+#         tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
+#         tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
+#         tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
+#         tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
+#     ]
 
-    return _wide_and_deep_classifier_advanced(
+    return _wide_and_deep_classifier_baseline(
         inputs=inputs,
         wide_columns=sparse.values(),
-        deep_columns=real_valued_columns,
-        mixed_columns=embed.values()
+        deep_columns=embed.values()
+        #mixed_columns=embed.values()
     )
 
 
 def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
-    input_layers = {
-        feature.name: tf.keras.layers.Input(name=t(feature.name), shape=())
-        for feature in inputs
-    }
-
-    deep = tf.keras.layers.DenseFeatures(deep_columns)(input_layers)
+    deep = tf.keras.layers.DenseFeatures(deep_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS:
         deep = tf.keras.layers.Dense(numnodes)(deep)
 
-    wide = tf.keras.layers.DenseFeatures(wide_columns)(input_layers)
+    wide = tf.keras.layers.DenseFeatures(wide_columns)(inputs)
 
     output = tf.keras.layers.concatenate([deep, wide])
     output = tf.keras.layers.Dense(1, activation='sigmoid')(output)
     output = tf.squeeze(output, -1)
 
-    model = tf.keras.Model(input_layers, output)
+    model = tf.keras.Model(inputs, output)
     model.compile(
         loss='binary_crossentropy',
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
@@ -167,14 +163,16 @@ def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed
         widesink = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
 
     output = tf.keras.layers.concatenate([deep, mix, widesink, wide])
-    output = tf.keras.layers.Dense(1)(output)
-    output = tf.squeeze(output, -1)
+    output = tf.keras.layers.Dense(3, activation='softmax')(output)
+    #output = tf.squeeze(output, -1)
 
     model = tf.keras.Model(inputs, output)
     model.compile(
-        loss=tf.keras.losses.Huber(),
+        #loss=tf.keras.losses.Huber(),
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
         metrics=[
+            'accuracy',
             tf.keras.metrics.LogCoshError(),
             tf.keras.metrics.MeanSquaredLogarithmicError(),
             tf.keras.metrics.MeanAbsolutePercentageError()
@@ -217,11 +215,7 @@ def run_fn(fn_args):
 
     signatures = {
         'serving_default':
-            _get_serve_tf_examples_fn(model,
-                                      tf_transform_output).get_concrete_function(
-                tf.TensorSpec(
-                    shape=[None],
-                    dtype=tf.string,
-                    name='examples')),
+            _get_serve_tf_examples_fn(model, tf_transform_output).get_concrete_function(
+                tf.TensorSpec(shape=[None],dtype=tf.string,name='examples')),
     }
     model.save(fn_args.serving_model_dir, save_format='tf', signatures=signatures)

@@ -58,61 +58,74 @@ def _build_keras_model():
     Returns:
     A keras Model.
     """
-    real_valued_columns = [
-        tf.feature_column.numeric_column(t('avg_total_per_trip_prev4h_area')),
-        tf.feature_column.numeric_column(t('avg_total_per_trip_prev4h_city')),
-        tf.feature_column.numeric_column(t('avg_ntrips_prev_4h_area')),
-        tf.feature_column.numeric_column(t('avg_ntrips_prev_4h_city'))
-    ]
 
-    categorical_columns = [
-        tf.feature_column.categorical_column_with_identity(t('avg_total_per_trip_prev4h_area'), 5),
-        tf.feature_column.categorical_column_with_identity(t('avg_total_per_trip_prev4h_city'), 5),
-        tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_area'), 100),
-        tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_city'), 100),
-        tf.feature_column.categorical_column_with_identity(t('hour24'), 4),
-        tf.feature_column.categorical_column_with_identity(t('area'), 77),
-        tf.feature_column.categorical_column_with_identity(t('is_holiday'), 2),
-        tf.feature_column.categorical_column_with_identity(t('day_of_week'), 7),
-        tf.feature_column.categorical_column_with_identity(t('month'), 12),
-        tf.feature_column.categorical_column_with_identity(t('day'), 31),
-        tf.feature_column.categorical_column_with_identity(t('hour12'), 12),
-        tf.feature_column.categorical_column_with_identity(t('day_period'), 2),
-    ]
+    # Data Input
+    sparse = dict(
+        avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_identity(
+            t('avg_total_per_trip_prev4h_area'), 5),
+        avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_identity(
+            t('avg_total_per_trip_prev4h_city'), 5),
+        avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_area'), 100),
+        avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_identity(t('avg_ntrips_prev_4h_city'), 100),
+        hour24=tf.feature_column.categorical_column_with_identity(t('hour24'), 4),
+        area=tf.feature_column.categorical_column_with_identity(t('area'), 77),
+        is_holiday=tf.feature_column.categorical_column_with_identity(t('is_holiday'), 2),
+        day_of_week=tf.feature_column.categorical_column_with_identity(t('day_of_week'), 7),
+        month=tf.feature_column.categorical_column_with_identity(t('month'), 12),
+        day=tf.feature_column.categorical_column_with_identity(t('day'), 31),
+        hour12=tf.feature_column.categorical_column_with_identity(t('hour12'), 12),
+        day_period=tf.feature_column.categorical_column_with_identity(t('day_period'), 2)
+    )
 
-    indicator_columns = [tf.feature_column.indicator_column(column) for column in categorical_columns]
+    # Categorical Input
+    inputs = {
+        colname : tf.keras.layers.Input(name=colname, shape=(), dtype='string')
+              for colname in sparse.keys()
+    }
 
-    crossed_columns = [
-        tf.feature_column.crossed_column(
+    # Feature Engineering
+    sparse.update(
+        is_holiday_day_of_week=tf.feature_column.crossed_column(
             [
                 tf.feature_column.categorical_column_with_identity(t('is_holiday'), 2),
                 tf.feature_column.categorical_column_with_identity(t('day_of_week'), 7)
             ],
             hash_bucket_size=14
         ),
-        tf.feature_column.crossed_column(
+        hour12_day_period=tf.feature_column.crossed_column(
             [
                 tf.feature_column.categorical_column_with_identity(t('hour12'), 12),
                 tf.feature_column.categorical_column_with_identity(t('day_period'), 2),
             ],
             hash_bucket_size=24
-        ),
-    ]
-    wide_columns = indicator_columns + crossed_columns
-
-    mixed_columns = [
-        tf.feature_column.embedding_column(t('area'), 4),
-        tf.feature_column.embedding_column(t('month'), 2),
-        tf.feature_column.embedding_column(t('day'), 3),
-    ]
-
-    model = _wide_and_deep_classifier_advanced(
-        inputs=real_valued_columns+wide_columns,
-        wide_columns=wide_columns,
-        deep_columns=real_valued_columns,
-        mixed_columns=mixed_columns
+        )
     )
-    return model
+
+    embed = dict(
+        area=tf.feature_column.embedding_column(sparse['area'], 4),
+        month=tf.feature_column.embedding_column(sparse['month'], 2),
+        day=tf.feature_column.embedding_column(sparse['day'], 3),
+    )
+
+    # one-hot encode the sparse columns
+    sparse = {
+        colname: tf.feature_column.indicator_column(col)
+        for colname, col in sparse.items()
+    }
+
+    real_valued_columns = [
+        tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
+        tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
+        tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
+        tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
+    ]
+
+    return _wide_and_deep_classifier_advanced(
+        inputs=inputs,
+        wide_columns=sparse.values(),
+        deep_columns=real_valued_columns,
+        mixed_columns=embed.values()
+    )
 
 
 def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
@@ -124,7 +137,7 @@ def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
     deep = tf.keras.layers.DenseFeatures(deep_columns)(input_layers)
     for numnodes in constants.HIDDEN_UNITS:
         deep = tf.keras.layers.Dense(numnodes)(deep)
-        
+
     wide = tf.keras.layers.DenseFeatures(wide_columns)(input_layers)
 
     output = tf.keras.layers.concatenate([deep, wide])
@@ -141,20 +154,15 @@ def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
 
 
 def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed_columns):
-    input_layers = {
-        feature.name: tf.keras.layers.Input(name=feature.name, shape=())
-        for feature in inputs
-    }
-
-    deep = tf.keras.layers.DenseFeatures(deep_columns)(input_layers)
+    deep = tf.keras.layers.DenseFeatures(deep_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED:
         deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
 
-    mix = tf.keras.layers.DenseFeatures(mixed_columns)(input_layers)
+    mix = tf.keras.layers.DenseFeatures(mixed_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
         mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
 
-    wide = tf.keras.layers.DenseFeatures(wide_columns)(input_layers)
+    wide = tf.keras.layers.DenseFeatures(wide_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
         widesink = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
 
@@ -162,7 +170,7 @@ def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed
     output = tf.keras.layers.Dense(1)(output)
     output = tf.squeeze(output, -1)
 
-    model = tf.keras.Model(input_layers, output)
+    model = tf.keras.Model(inputs, output)
     model.compile(
         loss=tf.keras.losses.Huber(),
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),

@@ -1,0 +1,8 @@
+description: This read-only role is supposed to be assigned in BigQuery Table-level
+  access control policy.
+includedPermissions:
+- bigquery.tables.get
+- bigquery.tables.getData
+name: projects/o-epm-gcp-by-meetup1-ml-t1iylu/roles/ChicagoTaxiDataflowBqReadOnlyPolicy
+stage: ALPHA
+title: Chicago Taxi Dataflow BQ Read-Only Policy

@@ -15,23 +15,7 @@ from tfx_bsl.public import tfxio
 from tensorflow_transform.tf_metadata import schema_utils
 
 
-FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
-LABEL_KEY = 'relative_demand'
-
-# Since we're not generating or creating a schema, we will instead create a feature spec.
-_FEATURE_SPEC = {
-    **{
-        feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
-        for feature in 'avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
-    },
-    **{
-        feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)
-        for feature in 'area,day_of_week,year,month,day,hour24,hour12'.split(',')
-    },
-    'is_holiday': tf.io.FixedLenFeature(shape=[1], dtype=tf.bool),
-    'day_period': tf.io.FixedLenFeature(shape=[1], dtype=tf.string),
-    LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
-}
+from models.features import FEATURE_SPEC, LABEL_KEY
 
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
@@ -85,22 +69,20 @@ def _build_keras_model() -> tf.keras.Model:
     """
 
     # Data Input
-    # inputs = dict(
-    #     avg_total_per_trip_prev4h_area=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_area', shape=(), dtype=tf.float32),
-    #     avg_total_per_trip_prev4h_city=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_city', shape=(), dtype=tf.float32),
-    #     avg_ntrips_prev_4h_area=tf.keras.layers.Input(name='avg_ntrips_prev_4h_area', shape=(), dtype=tf.float32),
-    #     avg_ntrips_prev_4h_city=tf.keras.layers.Input(name='avg_ntrips_prev_4h_city', shape=(), dtype=tf.float32),
-    #     hour24=tf.keras.layers.Input(name='hour24', shape=(), dtype=tf.string),
-    #     area=tf.keras.layers.Input(name='area', shape=(), dtype=tf.string),
-    #     is_holiday=tf.keras.layers.Input(name='is_holiday', shape=(), dtype=tf.string),
-    #     day_of_week=tf.keras.layers.Input(name='day_of_week', shape=(), dtype=tf.string),
-    #     month=tf.keras.layers.Input(name='month', shape=(), dtype=tf.string),
-    #     day=tf.keras.layers.Input(name='day', shape=(), dtype=tf.string),
-    #     hour12=tf.keras.layers.Input(name='hour12', shape=(), dtype=tf.string),
-    #     day_period=tf.keras.layers.Input(name='day_period', shape=(), dtype=tf.string)
-    # )
-
-    inputs = [tf.keras.layers.Input(shape=(1,), name=f) for f in FEATURE_KEYS]
+    inputs = dict(
+        avg_total_per_trip_prev4h_area=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_area', shape=(), dtype=tf.float32),
+        avg_total_per_trip_prev4h_city=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_city', shape=(), dtype=tf.float32),
+        avg_ntrips_prev_4h_area=tf.keras.layers.Input(name='avg_ntrips_prev_4h_area', shape=(), dtype=tf.float32),
+        avg_ntrips_prev_4h_city=tf.keras.layers.Input(name='avg_ntrips_prev_4h_city', shape=(), dtype=tf.float32),
+        hour24=tf.keras.layers.Input(name='hour24', shape=(), dtype=tf.string),
+        area=tf.keras.layers.Input(name='area', shape=(), dtype=tf.string),
+        is_holiday=tf.keras.layers.Input(name='is_holiday', shape=(), dtype=tf.string),
+        day_of_week=tf.keras.layers.Input(name='day_of_week', shape=(), dtype=tf.string),
+        month=tf.keras.layers.Input(name='month', shape=(), dtype=tf.string),
+        day=tf.keras.layers.Input(name='day', shape=(), dtype=tf.string),
+        hour12=tf.keras.layers.Input(name='hour12', shape=(), dtype=tf.string),
+        day_period=tf.keras.layers.Input(name='day_period', shape=(), dtype=tf.string)
+    )
     
     sparse = dict(
         #avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_area', 5),
@@ -219,12 +201,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # `schema_from_feature_spec` could be used to generate schema from very simple
     # feature_spec, but the schema returned would be very primitive.
 
-    schema = schema_utils.schema_from_feature_spec(_FEATURE_SPEC)
+    schema = schema_utils.schema_from_feature_spec(FEATURE_SPEC)
 
-    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor,
-                              schema, constants.TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor,
-                             schema, constants.EVAL_BATCH_SIZE)
+    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor,schema, constants.TRAIN_BATCH_SIZE)
+    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor,schema, constants.EVAL_BATCH_SIZE)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():

@@ -65,14 +65,14 @@ def create_pipeline(
     statistics_gen = StatisticsGen(
         examples=example_gen.outputs['examples']
     )
-    components.append(statistics_gen)
+    #components.append(statistics_gen)
 
     # Generates schema based on statistics files.
     schema_gen = SchemaGen(
         statistics=statistics_gen.outputs['statistics'], 
         infer_feature_shape=True
     )
-    components.append(schema_gen)
+    #components.append(schema_gen)
 
     # Performs anomaly detection based on statistics and data schema.
     example_validator = ExampleValidator(
@@ -87,14 +87,14 @@ def create_pipeline(
         schema=schema_gen.outputs['schema'], 
         preprocessing_fn=configs.PREPROCESSING_FN
     )
-    components.append(transform)
+    #components.append(transform)
         
     trainer = Trainer(
         run_fn=configs.RUN_FN,
-        #examples=example_gen.outputs['examples'],
-        transformed_examples=transform.outputs['transformed_examples'],
-        schema=schema_gen.outputs['schema'],
-        transform_graph=transform.outputs['transform_graph'],
+        examples=example_gen.outputs['examples'],
+        #transformed_examples=transform.outputs['transformed_examples'],
+        #schema=schema_gen.outputs['schema'],
+        #transform_graph=transform.outputs['transform_graph'],
         train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         #custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_trainer_executor.GenericExecutor),

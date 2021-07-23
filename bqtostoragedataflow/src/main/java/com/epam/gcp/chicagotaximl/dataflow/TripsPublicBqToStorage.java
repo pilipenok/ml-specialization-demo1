@@ -10,6 +10,7 @@ import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.common.annotations.VisibleForTesting;
+import lombok.AllArgsConstructor;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
@@ -118,27 +119,9 @@ public class TripsPublicBqToStorage {
                 .and(averagesTag, averageFares)
                 .apply("Joining data", CoGroupByKey.create());
 
-        PCollection<AreaTripsData> tripData = joined.apply(
-                "Constructing TripData",
-                MapElements.via(new SimpleFunction<KV<String, CoGbkResult>, AreaTripsData>() {
-                    @Override
-                    public AreaTripsData apply(KV<String, CoGbkResult> e) {
-                        CoGbkResult result = e.getValue();
-                        long count = result.getOnly(countsTag);
-                        double avg = result.getOnly(averagesTag);
-                        Trip sampleTrip = result.getAll(tripsTag).iterator().next();
-                        return createAreaTripsData(
-                                sampleTrip.getPickupArea(),
-                                sampleTrip.getTripStartHour(),
-                                count,
-                                roundAverageFare(avg),
-                                sampleTrip.isUsHoliday());
-                    }
-                }));
-
-        PCollection<String> csv = tripData.apply(
+        PCollection<String> csv = joined.apply(
                 "Converting to CSV format",
-                MapElements.via(new AreaTripsDataToCsvConverter()));
+                MapElements.via(new KvToCsvConverter(tripsTag, countsTag, averagesTag)));
 
         csv.apply("Waiting BQ inserts to finish",
                 Wait.on(taxiIdInsertsResult.getFailedInserts()))
@@ -173,22 +156,34 @@ public class TripsPublicBqToStorage {
     }
 
     /**
-     * Converts an AreaTripsData object into a CSV line.
+     * Converts a grouped data object into a CSV line.
      */
     @VisibleForTesting
-    static class AreaTripsDataToCsvConverter extends SimpleFunction<AreaTripsData, String> {
+    @AllArgsConstructor
+    static class KvToCsvConverter extends SimpleFunction<KV<String, CoGbkResult>, String> {
+        final TupleTag<Trip> tripsTag;
+        final TupleTag<Long> countsTag;
+        final TupleTag<Double> averagesTag;
+
+        private static final DateTimeFormatter amPmFormatter = DateTimeFormatter.ofPattern("a");
+        private static final DateTimeFormatter hourOfDayFormatter = DateTimeFormatter.ofPattern("h");
 
         @Override
-        public String apply(AreaTripsData v) {
+        public String apply(KV<String, CoGbkResult> e) {
+            CoGbkResult result = e.getValue();
+            long numberOfTrips = result.getOnly(countsTag);
+            double averageFare = result.getOnly(averagesTag);
+            Trip sampleTrip = result.getAll(tripsTag).iterator().next();
+
             return String.format("%s,%s,%s,%s,%s,%s,%s,%s",
-                    v.getPickupCommunityArea(),
-                    v.getDayOfWeek(),
-                    v.isUsHoliday(),
-                    v.getMonth(),
-                    v.getHourOfDay(),
-                    v.getAmPm(),
-                    v.getAverageFare(),
-                    v.getNumberOfTrips());
+                    sampleTrip.getPickupArea(),
+                    sampleTrip.getTripStartHour().getDayOfWeek().getValue(),
+                    sampleTrip.isUsHoliday(),
+                    sampleTrip.getTripStartHour().getMonthValue(),
+                    Integer.valueOf(sampleTrip.getTripStartHour().format(hourOfDayFormatter)),
+                    sampleTrip.getTripStartHour().format(amPmFormatter),
+                    averageFare,
+                    numberOfTrips);
         }
     }
 
@@ -209,26 +204,6 @@ public class TripsPublicBqToStorage {
             trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
             return trip;
         }
-    }
-
-    /**
-     * Constructs AreaTripsData object.
-     * @param count Number of trips in this area at a given hour.
-     * @param averageFare Average fare in this area at a given hour.
-     */
-    @VisibleForTesting
-    static AreaTripsData createAreaTripsData(
-            int communityArea, LocalDateTime dateTime, long count, double averageFare, boolean isUsHoliday) {
-        AreaTripsData tripData = new AreaTripsData();
-        tripData.setPickupCommunityArea(communityArea);
-        tripData.setNumberOfTrips(count);
-        tripData.setAverageFare(averageFare);
-        tripData.setMonth(dateTime.getMonthValue());
-        tripData.setDayOfWeek(dateTime.getDayOfWeek().getValue());
-        tripData.setHourOfDay(Integer.valueOf(dateTime.format(DateTimeFormatter.ofPattern("h"))));
-        tripData.setUsHoliday(isUsHoliday);
-        tripData.setAmPm(dateTime.format(DateTimeFormatter.ofPattern("a")));
-        return tripData;
     }
 
     /**

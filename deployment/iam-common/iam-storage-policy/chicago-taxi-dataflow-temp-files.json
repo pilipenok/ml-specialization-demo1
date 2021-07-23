@@ -1,0 +1,36 @@
+{
+  "bindings": [
+    {
+      "members": [
+        "serviceAccount:chicago-taxi-ml-demo-1-dataflo@o-epm-gcp-by-meetup1-ml-t1iylu.iam.gserviceaccount.com"
+      ],
+      "role": "projects/o-epm-gcp-by-meetup1-ml-t1iylu/roles/ChicagoTaxiDataflowStorageSystemAccess"
+    },
+    {
+      "members": [
+        "projectEditor:o-epm-gcp-by-meetup1-ml-t1iylu",
+        "projectOwner:o-epm-gcp-by-meetup1-ml-t1iylu"
+      ],
+      "role": "roles/storage.legacyBucketOwner"
+    },
+    {
+      "members": [
+        "projectViewer:o-epm-gcp-by-meetup1-ml-t1iylu"
+      ],
+      "role": "roles/storage.legacyBucketReader"
+    },
+    {
+      "members": [
+        "projectEditor:o-epm-gcp-by-meetup1-ml-t1iylu",
+        "projectOwner:o-epm-gcp-by-meetup1-ml-t1iylu"
+      ],
+      "role": "roles/storage.legacyObjectOwner"
+    },
+    {
+      "members": [
+        "projectViewer:o-epm-gcp-by-meetup1-ml-t1iylu"
+      ],
+      "role": "roles/storage.legacyObjectReader"
+    }
+  ]
+}

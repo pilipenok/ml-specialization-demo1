@@ -15,7 +15,7 @@ from tfx_bsl.public import tfxio
 from tensorflow_transform.tf_metadata import schema_utils
 
 
-from models.features import FEATURE_SPEC, LABEL_KEY
+from models.features import FEATURE_SPEC, LABEL_KEY, FEATURE_KEYS
 
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
@@ -67,28 +67,8 @@ def _build_keras_model() -> tf.keras.Model:
     Returns:
     A keras Model.
     """
-
-    # Data Input
-    inputs = dict(
-        avg_total_per_trip_prev4h_area=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_area', shape=(), dtype=tf.float32),
-        avg_total_per_trip_prev4h_city=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_city', shape=(), dtype=tf.float32),
-        avg_ntrips_prev_4h_area=tf.keras.layers.Input(name='avg_ntrips_prev_4h_area', shape=(), dtype=tf.float32),
-        avg_ntrips_prev_4h_city=tf.keras.layers.Input(name='avg_ntrips_prev_4h_city', shape=(), dtype=tf.float32),
-        hour24=tf.keras.layers.Input(name='hour24', shape=(), dtype=tf.string),
-        area=tf.keras.layers.Input(name='area', shape=(), dtype=tf.string),
-        is_holiday=tf.keras.layers.Input(name='is_holiday', shape=(), dtype=tf.string),
-        day_of_week=tf.keras.layers.Input(name='day_of_week', shape=(), dtype=tf.string),
-        month=tf.keras.layers.Input(name='month', shape=(), dtype=tf.string),
-        day=tf.keras.layers.Input(name='day', shape=(), dtype=tf.string),
-        hour12=tf.keras.layers.Input(name='hour12', shape=(), dtype=tf.string),
-        day_period=tf.keras.layers.Input(name='day_period', shape=(), dtype=tf.string)
-    )
     
     sparse = dict(
-        #avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_area', 5),
-        #avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_city', 5),
-        #avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_ntrips_prev_4h_area', 100),
-        #avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_hash_bucket('avg_ntrips_prev_4h_city', 100),
         hour24=tf.feature_column.categorical_column_with_hash_bucket('hour24', 4),
         area=tf.feature_column.categorical_column_with_hash_bucket('area', 77),
         is_holiday=tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false']),
@@ -125,32 +105,43 @@ def _build_keras_model() -> tf.keras.Model:
     }
 
     return _wide_and_deep_classifier_baseline(
-        inputs=inputs,
-        wide_columns=list(sparse.values()) + list(real_valued_columns.values()) ,
-        deep_columns=embed.values()
-        #mixed_columns=embed.values()
+        wide=real_valued_columns.values(),
+        deep=sparse.values(),
+        mix=embed.values()
     )
 
 
-def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
-    # inputs = tf.keras.layers.concatenate(inputs)
-
-    deep = tf.keras.layers.DenseFeatures(deep_columns)(inputs)
-    for numnodes in constants.HIDDEN_UNITS:
-        deep = tf.keras.layers.Dense(numnodes)(deep)
-
-    wide = tf.keras.layers.DenseFeatures(wide_columns)(inputs)
-
-    output = tf.keras.layers.concatenate([deep, wide])
-    output = tf.keras.layers.Dense(1, activation='sigmoid')(output)
-    output = tf.squeeze(output, -1)
-
-    model = tf.keras.Model(inputs, output)
+def _wide_and_deep_classifier_baseline(wide, deep, mix):
+    inputs = {f: tf.keras.layers.Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
+    
+    deep = tf.keras.layers.DenseFeatures(deep)(inputs)
+    for numnodes in constants.HIDDEN_UNITS_ADVANCED:
+        deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
+        
+    mix = tf.keras.layers.DenseFeatures(mix)(inputs)
+    for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
+        mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
+        
+    wide = tf.keras.layers.DenseFeatures(wide)(inputs)
+    for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
+        wide = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
+        
+    x = tf.keras.layers.concatenate([deep, mix, wide])
+    x = tf.keras.layers.Dense(1, activation='sigmoid')(x)
+    x = tf.squeeze(x, -1)
+    outputs = x
+    
+    model = tf.keras.Model(inputs, outputs)
     model.compile(
-        loss='binary_crossentropy',
+        loss=tf.keras.losses.Huber(),
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
-        metrics=[tf.keras.metrics.BinaryAccuracy()])
-    model.summary(print_fn=logging.info)
+        metrics=[
+            tf.keras.metrics.LogCoshError(),
+            tf.keras.metrics.MeanSquaredLogarithmicError(),
+            tf.keras.metrics.MeanAbsolutePercentageError()
+        ]
+    )
+    #model.summary(print_fn=logging.info)
     return model
 
 

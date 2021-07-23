@@ -1,14 +1,37 @@
 from __future__ import division
 from __future__ import print_function
 
+from typing import List
+
 from absl import logging
 import tensorflow as tf
 import tensorflow_transform as tft
 
-from models.keras.baseline_advanced import features
-from models.keras.baseline_advanced.features import transformed_name as t
 from models.keras.baseline_advanced import constants
-from tfx_bsl.tfxio import dataset_options
+
+from tensorflow_metadata.proto.v0 import schema_pb2
+from tfx import v1 as tfx
+from tfx_bsl.public import tfxio
+from tensorflow_transform.tf_metadata import schema_utils
+
+
+FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
+LABEL_KEY = 'relative_demand'
+
+# Since we're not generating or creating a schema, we will instead create a feature spec.
+_FEATURE_SPEC = {
+    **{
+        feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
+        for feature in 'avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
+    },
+    **{
+        feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)
+        for feature in 'area,day_of_week,year,month,day,hour24,hour12'.split(',')
+    },
+    'is_holiday': tf.io.FixedLenFeature(shape=[1], dtype=tf.bool),
+    'day_period': tf.io.FixedLenFeature(shape=[1], dtype=tf.string),
+    LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
+}
 
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
@@ -30,13 +53,16 @@ def _get_serve_tf_examples_fn(model, tf_transform_output):
     return serve_tf_examples_fn
 
 
-def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
-    """Generates features and label for tuning/training.
+def _input_fn(file_pattern: List[str],
+              data_accessor: tfx.components.DataAccessor,
+              schema: schema_pb2.Schema,
+              batch_size: int) -> tf.data.Dataset:
+    """Generates features and label for training.
 
     Args:
       file_pattern: List of paths or patterns of input tfrecord files.
       data_accessor: DataAccessor for converting input to RecordBatch.
-      tf_transform_output: A TFTransformOutput.
+      schema: schema of the input data.
       batch_size: representing the number of consecutive elements of returned
         dataset to combine in a single batch
 
@@ -46,12 +72,12 @@ def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
     """
     return data_accessor.tf_dataset_factory(
         file_pattern,
-        dataset_options.TensorFlowDatasetOptions(batch_size=batch_size,label_key='relative_demand'),
-        tf_transform_output.transformed_metadata.schema
+        tfxio.TensorFlowDatasetOptions(batch_size=batch_size, label_key=LABEL_KEY),
+        schema=schema
     ).repeat()
 
 
-def _build_keras_model():
+def _build_keras_model() -> tf.keras.Model:
     """Creates a DNN Keras model for classifying taxi data.
 
     Returns:
@@ -59,20 +85,22 @@ def _build_keras_model():
     """
 
     # Data Input
-#     sparse = dict(
-#         avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_identity('avg_total_per_trip_prev4h_area', 5),
-#         avg_total_per_trip_prev4h_city=tf.feature_column.categorical_column_with_identity('avg_total_per_trip_prev4h_city', 5),
-#         avg_ntrips_prev_4h_area=tf.feature_column.categorical_column_with_identity('avg_ntrips_prev_4h_area', 100),
-#         avg_ntrips_prev_4h_city=tf.feature_column.categorical_column_with_identity('avg_ntrips_prev_4h_city', 100),
-#         hour24=tf.feature_column.categorical_column_with_identity('hour24', 4),
-#         area=tf.feature_column.categorical_column_with_identity('area', 77),
-#         is_holiday=tf.feature_column.categorical_column_with_identity('is_holiday', 2),
-#         day_of_week=tf.feature_column.categorical_column_with_identity('day_of_week', 7),
-#         month=tf.feature_column.categorical_column_with_identity('month', 12),
-#         day=tf.feature_column.categorical_column_with_identity('day', 31),
-#         hour12=tf.feature_column.categorical_column_with_identity('hour12', 12),
-#         day_period=tf.feature_column.categorical_column_with_identity('day_period', 2)
-#     )
+    # inputs = dict(
+    #     avg_total_per_trip_prev4h_area=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_area', shape=(), dtype=tf.float32),
+    #     avg_total_per_trip_prev4h_city=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_city', shape=(), dtype=tf.float32),
+    #     avg_ntrips_prev_4h_area=tf.keras.layers.Input(name='avg_ntrips_prev_4h_area', shape=(), dtype=tf.float32),
+    #     avg_ntrips_prev_4h_city=tf.keras.layers.Input(name='avg_ntrips_prev_4h_city', shape=(), dtype=tf.float32),
+    #     hour24=tf.keras.layers.Input(name='hour24', shape=(), dtype=tf.string),
+    #     area=tf.keras.layers.Input(name='area', shape=(), dtype=tf.string),
+    #     is_holiday=tf.keras.layers.Input(name='is_holiday', shape=(), dtype=tf.string),
+    #     day_of_week=tf.keras.layers.Input(name='day_of_week', shape=(), dtype=tf.string),
+    #     month=tf.keras.layers.Input(name='month', shape=(), dtype=tf.string),
+    #     day=tf.keras.layers.Input(name='day', shape=(), dtype=tf.string),
+    #     hour12=tf.keras.layers.Input(name='hour12', shape=(), dtype=tf.string),
+    #     day_period=tf.keras.layers.Input(name='day_period', shape=(), dtype=tf.string)
+    # )
+
+    inputs = [tf.keras.layers.Input(shape=(1,), name=f) for f in FEATURE_KEYS]
     
     sparse = dict(
         #avg_total_per_trip_prev4h_area=tf.feature_column.categorical_column_with_hash_bucket('avg_total_per_trip_prev4h_area', 5),
@@ -94,28 +122,6 @@ def _build_keras_model():
         avg_total_per_trip_prev4h_city=tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
         avg_ntrips_prev_4h_area=tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
         avg_ntrips_prev_4h_city=tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
-    )
-    
-
-    # Categorical Input
-#     inputs = {
-#         colname : tf.keras.layers.Input(name=colname, shape=(), dtype=feature.dtype)
-#               for colname, feature in sparse.items()
-#     }
-    
-    inputs = dict(
-        avg_total_per_trip_prev4h_area=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_area', shape=(), dtype=tf.float32),
-        avg_total_per_trip_prev4h_city=tf.keras.layers.Input(name='avg_total_per_trip_prev4h_city', shape=(), dtype=tf.float32),
-        avg_ntrips_prev_4h_area=tf.keras.layers.Input(name='avg_ntrips_prev_4h_area', shape=(), dtype=tf.float32),
-        avg_ntrips_prev_4h_city=tf.keras.layers.Input(name='avg_ntrips_prev_4h_city', shape=(), dtype=tf.float32),
-        hour24=tf.keras.layers.Input(name='hour24', shape=(), dtype=tf.string),
-        area=tf.keras.layers.Input(name='area', shape=(), dtype=tf.string),
-        is_holiday=tf.keras.layers.Input(name='is_holiday', shape=(), dtype=tf.string),
-        day_of_week=tf.keras.layers.Input(name='day_of_week', shape=(), dtype=tf.string),
-        month=tf.keras.layers.Input(name='month', shape=(), dtype=tf.string),
-        day=tf.keras.layers.Input(name='day', shape=(), dtype=tf.string),
-        hour12=tf.keras.layers.Input(name='hour12', shape=(), dtype=tf.string),
-        day_period=tf.keras.layers.Input(name='day_period', shape=(), dtype=tf.string)
     )
 
     # Feature Engineering
@@ -145,6 +151,8 @@ def _build_keras_model():
 
 
 def _wide_and_deep_classifier_baseline(inputs, wide_columns, deep_columns):
+    # inputs = tf.keras.layers.concatenate(inputs)
+
     deep = tf.keras.layers.DenseFeatures(deep_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS:
         deep = tf.keras.layers.Dense(numnodes)(deep)
@@ -196,19 +204,27 @@ def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed
 
 
 # TFX Trainer will call this function.
-def run_fn(fn_args):
+def run_fn(fn_args: tfx.components.FnArgs):
     """Train the model based on given args.
 
     Args:
-      fn_args: Holds args used to train the model as name/value pairs.
+    fn_args: Holds args used to train the model as name/value pairs.
     """
 
-    tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
+    #tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
+
+    # This schema is usually either an output of SchemaGen or a manually-curated
+    # version provided by pipeline author. A schema can also derived from TFT
+    # graph if a Transform component is used. In the case when either is missing,
+    # `schema_from_feature_spec` could be used to generate schema from very simple
+    # feature_spec, but the schema returned would be very primitive.
+
+    schema = schema_utils.schema_from_feature_spec(_FEATURE_SPEC)
 
     train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor,
-                              tf_transform_output, constants.TRAIN_BATCH_SIZE)
+                              schema, constants.TRAIN_BATCH_SIZE)
     eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor,
-                             tf_transform_output, constants.EVAL_BATCH_SIZE)
+                             schema, constants.EVAL_BATCH_SIZE)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
@@ -226,9 +242,9 @@ def run_fn(fn_args):
         # callbacks=[tensorboard_callback]
     )
 
-    signatures = {
-        'serving_default':
-            _get_serve_tf_examples_fn(model, tf_transform_output).get_concrete_function(
-                tf.TensorSpec(shape=[None],dtype=tf.string,name='examples')),
-    }
-    model.save(fn_args.serving_model_dir, save_format='tf', signatures=signatures)
+    # signatures = {
+    #     'serving_default':
+    #         _get_serve_tf_examples_fn(model, tf_transform_output).get_concrete_function(
+    #             tf.TensorSpec(shape=[None],dtype=tf.string,name='examples')),
+    # }
+    model.save(fn_args.serving_model_dir, save_format='tf')

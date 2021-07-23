@@ -24,6 +24,7 @@ import tensorflow as tf
 import tensorflow_transform as tft
 
 from models import features
+from absl import logging
 
 
 def _fill_in_missing(x):
@@ -50,6 +51,7 @@ def _fill_in_missing(x):
 
 
 def preprocessing_fn(inputs):
+    logging.info(str(list(inputs.keys())))
     """tf.transform's callback function for preprocessing inputs.
 
     Args:
@@ -58,28 +60,21 @@ def preprocessing_fn(inputs):
     Returns:
         Map from string feature key to transformed feature operations.
     """
-    outputs = {}
-#   for key in features.DENSE_FLOAT_FEATURE_KEYS:
-#     # Preserve this feature as a dense float, setting nan's to the mean.
-#     outputs[key] = tft.scale_to_z_score(
-#         _fill_in_missing(inputs[key]))
-
-#   for key in features.VOCAB_FEATURE_KEYS:
-#     # Build a vocabulary for this feature.
-#     outputs[key] = tft.compute_and_apply_vocabulary(_fill_in_missing(inputs[key]),top_k=features.VOCAB_SIZE,num_oov_buckets=features.OOV_SIZE)
-
-#   for key, num_buckets in zip(features.BUCKET_FEATURE_KEYS,
-#                               features.BUCKET_FEATURE_BUCKET_COUNT):
-#     outputs[key] = tft.bucketize(_fill_in_missing(inputs[key]), num_buckets)
-
-#   for key in features.CATEGORICAL_FEATURE_KEYS:
-#     outputs[features.transformed_name(key)] = _fill_in_missing(inputs[key])
     
-    for key in inputs:
-        outputs[key] = _fill_in_missing(inputs[key])
-
-  # TODO(b/157064428): Support label transformation for Keras.
-  # Do not apply label transformation as it will result in wrong evaluation.
-    outputs['relative_demand'] = inputs['relative_demand']
+    outputs = dict(
+        avg_total_per_trip_prev4h_area=tft.scale_to_z_score(_fill_in_missing(inputs['avg_total_per_trip_prev4h_area'])),
+        avg_total_per_trip_prev4h_city=tft.scale_to_z_score(_fill_in_missing(inputs['avg_total_per_trip_prev4h_city'])),
+        avg_ntrips_prev_4h_area=tft.scale_to_z_score(_fill_in_missing(inputs['avg_ntrips_prev_4h_area'])),
+        avg_ntrips_prev_4h_city=tft.scale_to_z_score(_fill_in_missing(inputs['avg_ntrips_prev_4h_city'])),
+        hour24=tft.bucketize(_fill_in_missing(inputs['hour24']), 4),
+        area=tft.bucketize(_fill_in_missing(inputs['area']), 77),
+        is_holiday=_fill_in_missing(inputs['is_holiday']),
+        day_of_week=_fill_in_missing(inputs['day_of_week']),
+        month=_fill_in_missing(inputs['month']),
+        day=_fill_in_missing(inputs['day']),
+        hour12=_fill_in_missing(inputs['hour12']),
+        day_period=_fill_in_missing(inputs['day_period']),
+        relative_demand=inputs["relative_demand"]
+    )
 
     return outputs

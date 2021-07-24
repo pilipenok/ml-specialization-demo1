@@ -46,6 +46,7 @@ from tfx.types.standard_artifacts import ModelBlessing
 from ml_metadata.proto import metadata_store_pb2
 
 from pipeline import configs
+from models.features import LABEL_KEY
 
 def create_pipeline(
     pipeline_name: Text,
@@ -65,21 +66,21 @@ def create_pipeline(
     statistics_gen = StatisticsGen(
         examples=example_gen.outputs['examples']
     )
-    #components.append(statistics_gen)
+    components.append(statistics_gen)
 
     # Generates schema based on statistics files.
     schema_gen = SchemaGen(
         statistics=statistics_gen.outputs['statistics'], 
         infer_feature_shape=True
     )
-    #components.append(schema_gen)
+    components.append(schema_gen)
 
     # Performs anomaly detection based on statistics and data schema.
     example_validator = ExampleValidator(
         statistics=statistics_gen.outputs['statistics'], 
         schema=schema_gen.outputs['schema']
     )
-    # components.append(example_validator)
+    components.append(example_validator)
 
     # Performs transformations and feature engineering in training and serving.
     transform = Transform(
@@ -113,7 +114,7 @@ def create_pipeline(
     # Uses TFMA to compute a evaluation statistics over features of a model and
     # perform quality validation of a candidate model (compared to a baseline).
     eval_config = tfma.EvalConfig(
-        model_specs=[tfma.ModelSpec(label_key='big_tipper')],
+        model_specs=[tfma.ModelSpec(label_key=LABEL_KEY)],
         slicing_specs=[tfma.SlicingSpec()],
         metrics_specs=[
             tfma.MetricsSpec(metrics=[
@@ -143,7 +144,7 @@ def create_pipeline(
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
         custom_config={ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS}
     )
-    #components.append(pusher)
+    components.append(pusher)
 
     return pipeline.Pipeline(
         pipeline_name=pipeline_name,

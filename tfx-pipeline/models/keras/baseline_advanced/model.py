@@ -16,6 +16,7 @@ from tensorflow_transform.tf_metadata import schema_utils
 
 
 from models.features import FEATURE_SPEC, LABEL_KEY, FEATURE_KEYS
+from pipeline import configs
 
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
@@ -135,6 +136,7 @@ def _wide_and_deep_classifier_baseline(wide, deep, mix):
         loss=tf.keras.losses.Huber(),
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
         metrics=[
+            #'accuracy',
             tf.keras.metrics.LogCoshError(),
             tf.keras.metrics.MeanSquaredLogarithmicError(),
             tf.keras.metrics.MeanAbsolutePercentageError()
@@ -193,8 +195,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     schema = schema_utils.schema_from_feature_spec(FEATURE_SPEC)
 
-    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, constants.TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, constants.EVAL_BATCH_SIZE)
+    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, configs.TRAIN_BATCH_SIZE)
+    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, configs.EVAL_BATCH_SIZE)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
@@ -208,8 +210,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
         train_dataset,
         steps_per_epoch=fn_args.train_steps,
         validation_data=eval_dataset,
-        validation_steps=fn_args.eval_steps
-        # callbacks=[tensorboard_callback]
+        validation_steps=fn_args.eval_steps,
+        callbacks=[tensorboard_callback]
     )
 
     # signatures = {

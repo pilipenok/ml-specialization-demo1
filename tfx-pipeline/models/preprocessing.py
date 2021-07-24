@@ -51,7 +51,6 @@ def _fill_in_missing(x):
 
 
 def preprocessing_fn(inputs):
-    logging.info(str(list(inputs.keys())))
     """tf.transform's callback function for preprocessing inputs.
 
     Args:

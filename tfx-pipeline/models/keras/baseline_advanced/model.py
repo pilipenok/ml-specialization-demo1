@@ -69,14 +69,14 @@ def _build_keras_model() -> tf.keras.Model:
     """
     
     sparse = dict(
-        hour24=tf.feature_column.categorical_column_with_hash_bucket('hour24', 4),
-        area=tf.feature_column.categorical_column_with_hash_bucket('area', 77),
-        is_holiday=tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false']),
-        day_of_week=tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', list(map(str, range(7)))),
-        month=tf.feature_column.categorical_column_with_vocabulary_list('month', list(map(str, range(12)))),
-        day=tf.feature_column.categorical_column_with_vocabulary_list('day', list(map(str, range(31)))),
-        hour12=tf.feature_column.categorical_column_with_vocabulary_list('hour12', list(map(str, range(12)))),
-        day_period=tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'])
+        hour24=tf.feature_column.categorical_column_with_hash_bucket('hour24', 4, dtype=tf.int64),
+        area=tf.feature_column.categorical_column_with_hash_bucket('area', 77, dtype=tf.int64),
+        is_holiday=tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
+        day_of_week=tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', range(7), dtype=tf.int64),
+        month=tf.feature_column.categorical_column_with_vocabulary_list('month', range(12), dtype=tf.int64),
+        day=tf.feature_column.categorical_column_with_vocabulary_list('day', range(31), dtype=tf.int64),
+        hour12=tf.feature_column.categorical_column_with_vocabulary_list('hour12', range(12), dtype=tf.int64),
+        day_period=tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'], dtype=tf.string)
     )
     
     real_valued_columns = dict(
@@ -105,28 +105,27 @@ def _build_keras_model() -> tf.keras.Model:
     }
 
     return _wide_and_deep_classifier_baseline(
-        wide=real_valued_columns.values(),
-        deep=sparse.values(),
-        mix=embed.values()
+        wide=real_valued_columns,
+        deep=sparse,
+        mix=embed
     )
-
 
 def _wide_and_deep_classifier_baseline(wide, deep, mix):
     inputs = {f: tf.keras.layers.Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
-    
-    deep = tf.keras.layers.DenseFeatures(deep)(inputs)
+
+    deep = tf.keras.layers.DenseFeatures(deep.values())(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED:
         deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
         
-    mix = tf.keras.layers.DenseFeatures(mix)(inputs)
+    mix = tf.keras.layers.DenseFeatures(mix.values())(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
         mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
-        
-    wide = tf.keras.layers.DenseFeatures(wide)(inputs)
+
+    wide = tf.keras.layers.DenseFeatures(wide.values())(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
         wide = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
         
-    x = tf.keras.layers.concatenate([deep, mix, wide])
+    x = tf.keras.layers.concatenate([deep, wide])
     x = tf.keras.layers.Dense(1, activation='sigmoid')(x)
     x = tf.squeeze(x, -1)
     outputs = x
@@ -194,8 +193,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     schema = schema_utils.schema_from_feature_spec(FEATURE_SPEC)
 
-    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor,schema, constants.TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor,schema, constants.EVAL_BATCH_SIZE)
+    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, constants.TRAIN_BATCH_SIZE)
+    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, constants.EVAL_BATCH_SIZE)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():

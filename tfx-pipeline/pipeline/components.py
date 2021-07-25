@@ -10,12 +10,13 @@ import tensorflow_model_analysis as tfma
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 
 from pipeline import configs
-from models.features import LABEL_KEY
+#from models.features import LABEL_KEY
+LABEL_KEY = 'relative_demand'
 
 from functools import lru_cache
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def example_gen():
     # Brings data into the pipeline or otherwise joins/converts training data.
     return CsvExampleGen(
@@ -23,7 +24,7 @@ def example_gen():
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def statistics_gen(
         example_gen=example_gen()
 ):
@@ -33,7 +34,7 @@ def statistics_gen(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def schema_gen(
         statistics_gen=statistics_gen()
 ):
@@ -44,7 +45,7 @@ def schema_gen(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def example_validator(
         statistics_gen=statistics_gen(),
         schema_gen=schema_gen()
@@ -56,7 +57,7 @@ def example_validator(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def transform(
         example_gen=example_gen(),
         schema_gen=schema_gen()
@@ -69,7 +70,7 @@ def transform(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def trainer(
         example_gen=example_gen(),
         schema_gen=schema_gen(),
@@ -88,7 +89,7 @@ def trainer(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def model_resolver():
     # Get the latest blessed model for model validation.
     return resolver.Resolver(
@@ -98,7 +99,7 @@ def model_resolver():
     ).with_id('latest_blessed_model_resolver')
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def evaluator(
         example_gen=example_gen(),
         trainer=trainer(),
@@ -133,7 +134,7 @@ def evaluator(
     )
 
 
-@lru_cache
+@lru_cache(maxsize=None)
 def pusher(
         trainer=trainer()
 ):

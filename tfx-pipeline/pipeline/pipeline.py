@@ -37,11 +37,23 @@ def create_pipeline(
     """Implements the chicago taxi pipeline with TFX."""
 
     _example_gen = example_gen()
-    _statistics_gen = statistics_gen(example_gen=_example_gen)
-    _schema_gen = schema_gen(statistics_gen=_statistics_gen)
-    _example_validator = example_validator(statistics_gen=_statistics_gen, schema_gen=_schema_gen)
-    _trainer = trainer(example_gen=_example_gen, schema_gen=_schema_gen)
-    _pusher = pusher(trainer=_trainer)
+    _statistics_gen = statistics_gen(
+        example_gen=_example_gen
+    )
+    _schema_gen = schema_gen(
+        statistics_gen=_statistics_gen
+    )
+    _example_validator = example_validator(
+        statistics_gen=_statistics_gen, 
+        schema_gen=_schema_gen
+    )
+    _trainer = trainer(
+        example_gen=_example_gen, 
+        schema_gen=_schema_gen
+    )
+    _pusher = pusher(
+        trainer=_trainer
+    )
 
     components = [
         _example_gen,
@@ -52,7 +64,7 @@ def create_pipeline(
         _trainer,
         #model_resolver(),
         #evaluator(),
-        pusher()
+        _pusher
     ]
 
     return pipeline.Pipeline(

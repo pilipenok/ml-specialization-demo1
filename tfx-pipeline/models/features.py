@@ -52,7 +52,7 @@ FEATURE_SPEC = {
 
 
 def get_schema():
-    #return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
-    return components.schema_gen().outputs['schema']
+    return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
+    #return components.schema_gen().outputs['schema']
 
 

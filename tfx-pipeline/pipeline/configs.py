@@ -36,7 +36,7 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 
-TRAIN_NUM_STEPS = 10000
+TRAIN_NUM_STEPS = 1000
 EVAL_NUM_STEPS = 100
 EVAL_ACCURACY_THRESHOLD = 0.6
 TRAIN_BATCH_SIZE = 128

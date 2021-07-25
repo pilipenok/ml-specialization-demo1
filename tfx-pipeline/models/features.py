@@ -24,6 +24,8 @@ from __future__ import print_function
 
 import tensorflow as tf
 from tensorflow_transform.tf_metadata import schema_utils
+import tensorflow_transform as tft
+
 from pipeline import components
 
 

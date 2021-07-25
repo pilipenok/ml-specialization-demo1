@@ -109,6 +109,7 @@ def _build_keras_model() -> tf.keras.Model:
         mix=embed
     )
 
+
 def _wide_and_deep_classifier_baseline(wide, deep, mix):
     inputs = {f: tf.keras.layers.Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 

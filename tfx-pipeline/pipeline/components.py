@@ -15,64 +15,80 @@ from models.features import LABEL_KEY
 from functools import lru_cache
 
 
-@lru_cache()
+@lru_cache
 def example_gen():
     # Brings data into the pipeline or otherwise joins/converts training data.
-    return CsvExampleGen(input_base=configs.DATA_PATH)
-
-
-@lru_cache()
-def statistics_gen():
-    # Computes statistics over data for visualization and example validation.
-    return StatisticsGen(
-        examples=example_gen().outputs['examples']
+    return CsvExampleGen(
+        input_base=configs.DATA_PATH
     )
 
 
-@lru_cache()
-def schema_gen():
+@lru_cache
+def statistics_gen(
+        example_gen=example_gen()
+):
+    # Computes statistics over data for visualization and example validation.
+    return StatisticsGen(
+        examples=example_gen.outputs['examples']
+    )
+
+
+@lru_cache
+def schema_gen(
+        statistics_gen=statistics_gen()
+):
     # Generates schema based on statistics files.
     return SchemaGen(
-        statistics=statistics_gen().outputs['statistics'],
+        statistics=statistics_gen.outputs['statistics'],
         infer_feature_shape=True
     )
 
 
-@lru_cache()
-def example_validator():
+@lru_cache
+def example_validator(
+        statistics_gen=statistics_gen(),
+        schema_gen=schema_gen()
+):
     # Performs anomaly detection based on statistics and data schema.
     return ExampleValidator(
-        statistics=statistics_gen().outputs['statistics'],
-        schema=schema_gen().outputs['schema']
+        statistics=statistics_gen.outputs['statistics'],
+        schema=schema_gen.outputs['schema']
     )
 
 
-@lru_cache()
-def transform():
+@lru_cache
+def transform(
+        example_gen=example_gen(),
+        schema_gen=schema_gen()
+):
     # Performs transformations and feature engineering in training and serving.
     return Transform(
-        examples=example_gen().outputs['examples'],
-        schema=schema_gen().outputs['schema'],
+        examples=example_gen.outputs['examples'],
+        schema=schema_gen.outputs['schema'],
         preprocessing_fn=configs.PREPROCESSING_FN
     )
 
 
-@lru_cache()
-def trainer():
+@lru_cache
+def trainer(
+        example_gen=example_gen(),
+        schema_gen=schema_gen(),
+        # transform=transform()
+):
     return Trainer(
         run_fn=configs.RUN_FN,
-        examples=example_gen().outputs['examples'],
+        examples=example_gen.outputs['examples'],
         # transformed_examples=transform.outputs['transformed_examples'],
-        # schema=schema_gen.outputs['schema'],
+        schema=schema_gen.outputs['schema'],
         # transform_graph=transform.outputs['transform_graph'],
         train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
-        custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_trainer_executor.GenericExecutor),
+        #custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_trainer_executor.GenericExecutor),
         custom_config={ai_platform_trainer_executor.TRAINING_ARGS_KEY: configs.GCP_AI_PLATFORM_TRAINING_ARGS}
     )
 
 
-@lru_cache()
+@lru_cache
 def model_resolver():
     # Get the latest blessed model for model validation.
     return resolver.Resolver(
@@ -82,8 +98,12 @@ def model_resolver():
     ).with_id('latest_blessed_model_resolver')
 
 
-@lru_cache()
-def evaluator():
+@lru_cache
+def evaluator(
+        example_gen=example_gen(),
+        trainer=trainer(),
+        model_resolver=model_resolver()
+):
     # Uses TFMA to compute a evaluation statistics over features of a model and
     # perform quality validation of a candidate model (compared to a baseline).
 
@@ -105,18 +125,20 @@ def evaluator():
         ])
 
     return Evaluator(
-        examples=example_gen().outputs['examples'],
-        model=trainer().outputs['model'],
-        baseline_model=model_resolver().outputs['model'],
+        examples=example_gen.outputs['examples'],
+        model=trainer.outputs['model'],
+        baseline_model=model_resolver.outputs['model'],
         # Change threshold will be ignored if there is no baseline (first run).
         eval_config=eval_config
     )
 
 
-@lru_cache()
-def pusher():
+@lru_cache
+def pusher(
+        trainer=trainer()
+):
     return Pusher(
-        model=trainer().outputs['model'],
+        model=trainer.outputs['model'],
         # model_blessing=evaluator.outputs['blessing'],
         # push_destination=pusher_pb2.PushDestination(filesystem=pusher_pb2.PushDestination.Filesystem(base_directory=configs.SERVING_MODEL_DIR)),
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),

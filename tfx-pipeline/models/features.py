@@ -25,6 +25,7 @@ from __future__ import print_function
 from typing import Text, List
 
 import tensorflow as tf
+from tensorflow_transform.tf_metadata import schema_utils
 
 
 FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
@@ -47,4 +48,9 @@ FEATURE_SPEC = {
     'day_period': tf.io.FixedLenFeature(shape=[1], dtype=tf.string),
     LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
 }
+
+
+def get_schema():
+    return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
+
 

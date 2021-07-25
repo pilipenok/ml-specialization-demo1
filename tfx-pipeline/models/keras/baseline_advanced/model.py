@@ -5,17 +5,15 @@ from typing import List
 
 from absl import logging
 import tensorflow as tf
-import tensorflow_transform as tft
 
 from models.keras.baseline_advanced import constants
 
 from tensorflow_metadata.proto.v0 import schema_pb2
 from tfx import v1 as tfx
 from tfx_bsl.public import tfxio
-from tensorflow_transform.tf_metadata import schema_utils
 
 
-from models.features import FEATURE_SPEC, LABEL_KEY, FEATURE_KEYS
+from models.features import FEATURE_SPEC, LABEL_KEY, FEATURE_KEYS, get_schema
 from pipeline import configs
 
 
@@ -193,7 +191,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # `schema_from_feature_spec` could be used to generate schema from very simple
     # feature_spec, but the schema returned would be very primitive.
 
-    schema = schema_utils.schema_from_feature_spec(FEATURE_SPEC)
+    schema = get_schema()
 
     train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, configs.TRAIN_BATCH_SIZE)
     eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, configs.EVAL_BATCH_SIZE)

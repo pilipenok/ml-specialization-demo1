@@ -12,12 +12,16 @@ from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platfo
 from pipeline import configs
 from models.features import LABEL_KEY
 
+from functools import lru_cache
 
+
+@lru_cache()
 def example_gen():
     # Brings data into the pipeline or otherwise joins/converts training data.
     return CsvExampleGen(input_base=configs.DATA_PATH)
 
 
+@lru_cache()
 def statistics_gen():
     # Computes statistics over data for visualization and example validation.
     return StatisticsGen(
@@ -25,6 +29,7 @@ def statistics_gen():
     )
 
 
+@lru_cache()
 def schema_gen():
     # Generates schema based on statistics files.
     return SchemaGen(
@@ -33,6 +38,7 @@ def schema_gen():
     )
 
 
+@lru_cache()
 def example_validator():
     # Performs anomaly detection based on statistics and data schema.
     return ExampleValidator(
@@ -41,6 +47,7 @@ def example_validator():
     )
 
 
+@lru_cache()
 def transform():
     # Performs transformations and feature engineering in training and serving.
     return Transform(
@@ -50,6 +57,7 @@ def transform():
     )
 
 
+@lru_cache()
 def trainer():
     return Trainer(
         run_fn=configs.RUN_FN,
@@ -64,6 +72,7 @@ def trainer():
     )
 
 
+@lru_cache()
 def model_resolver():
     # Get the latest blessed model for model validation.
     return resolver.Resolver(
@@ -73,6 +82,7 @@ def model_resolver():
     ).with_id('latest_blessed_model_resolver')
 
 
+@lru_cache()
 def evaluator():
     # Uses TFMA to compute a evaluation statistics over features of a model and
     # perform quality validation of a candidate model (compared to a baseline).
@@ -103,6 +113,7 @@ def evaluator():
     )
 
 
+@lru_cache()
 def pusher():
     return Pusher(
         model=trainer().outputs['model'],

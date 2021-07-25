@@ -22,10 +22,9 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from typing import Text, List
-
 import tensorflow as tf
 from tensorflow_transform.tf_metadata import schema_utils
+from pipeline import components
 
 
 FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
@@ -51,6 +50,7 @@ FEATURE_SPEC = {
 
 
 def get_schema():
-    return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
+    #return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
+    return components.schema_gen().outputs['schema']
 
 

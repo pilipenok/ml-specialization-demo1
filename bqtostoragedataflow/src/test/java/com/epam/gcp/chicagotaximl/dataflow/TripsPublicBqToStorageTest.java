@@ -7,16 +7,23 @@
 package com.epam.gcp.chicagotaximl.dataflow;
 
 
-import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.AreaTripsDataToCsvConverter;
+import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.KvToCsvConverter;
 import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.TableRowToTripConverter;
 import com.google.api.services.bigquery.model.TableSchema;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
+import org.apache.beam.sdk.transforms.join.CoGbkResult;
+import org.apache.beam.sdk.transforms.join.CoGbkResultSchema;
+import org.apache.beam.sdk.transforms.join.RawUnionValue;
+import org.apache.beam.sdk.values.KV;
+import org.apache.beam.sdk.values.TupleTag;
+import org.apache.beam.sdk.values.TupleTagList;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -33,29 +40,8 @@ class TripsPublicBqToStorageTest {
     }
 
     @Test
-    public void testAreaTripsDataToCsvConverter() {
-        AreaTripsData data = new AreaTripsData();
-        data.setAmPm("AM");
-        data.setAverageFare(20.14);
-        data.setDayOfWeek(2);
-        data.setNumberOfTrips(20l);
-        data.setHourOfDay(3);
-        data.setMonth(4);
-        data.setPickupCommunityArea(77);
-        data.setUsHoliday(true);
-        AreaTripsDataToCsvConverter converter = new AreaTripsDataToCsvConverter();
-        assertThat(converter.apply(data)).isEqualTo("77,2,true,4,3,AM,20.14,20");
-    }
-
-    @Test
     public void testMakeAreaHourGroupingKey() {
-        Trip trip = new Trip("tripid");
-        trip.setFare(20.18f);
-        trip.setPickupArea(77);
-        trip.setTripStartHour(LocalDateTime.of(2021, 5, 10, 19, 0));
-        trip.setPickupLongitude(41.55555);
-        trip.setPickupLongitude(-87.999999);
-        trip.setUsHoliday(false);
+        Trip trip = createTrip("tripid", 20.18f, 77, LocalDateTime.of(2021, 5, 10, 19, 0), 41.55555, -87.999999, false);
         assertThat(TripsPublicBqToStorage.makeAreaHourGroupingKey(trip)).isEqualTo("77_2021-05-10T19:00");
     }
 
@@ -115,15 +101,40 @@ class TripsPublicBqToStorageTest {
     }
 
     @Test
-    public void testCreateAreaTripsData() {
-        AreaTripsData areaTripsData = TripsPublicBqToStorage
-                .createAreaTripsData(77, LocalDateTime.of(2021, 5, 8, 13, 0), 100, 30.12345, true);
-        assertThat(areaTripsData.getAmPm()).isEqualTo("PM");
-        assertThat(areaTripsData.getNumberOfTrips()).isEqualTo(100);
-        assertThat(areaTripsData.getAverageFare()).isEqualTo(30.12345);
-        assertThat(areaTripsData.getDayOfWeek()).isEqualTo(6);
-        assertThat(areaTripsData.getMonth()).isEqualTo(5);
-        assertThat(areaTripsData.getHourOfDay()).isEqualTo(1);
-        assertThat(areaTripsData.getPickupCommunityArea()).isEqualTo(77);
+    public void testKvToCsvConversion() {
+        final TupleTag<Trip> tripsTag = new TupleTag<>();
+        final TupleTag<Long> countsTag = new TupleTag<>();
+        final TupleTag<Double> averagesTag = new TupleTag<>();
+
+        TupleTagList tags = TupleTagList.of(tripsTag).and(countsTag).and(averagesTag);
+        CoGbkResultSchema schema = new CoGbkResultSchema(tags);
+
+        // Grouped values: area 77, 2021-12-01 1pm-2pm, average fare 18.1
+        RawUnionValue trip1Value1 = new RawUnionValue(0,
+                createTrip("1", 23.5f, 77, LocalDateTime.of(2021, 12, 1, 13, 5, 0), 41.111, -87.555, true));
+        RawUnionValue trip2Value1 = new RawUnionValue(0,
+                createTrip("2", 12.7f, 77, LocalDateTime.of(2021, 12, 1, 13, 10, 0), 41.222, -87.666, true));
+        RawUnionValue countsValue1 = new RawUnionValue(1, 2l);
+        RawUnionValue averageFareValue1 = new RawUnionValue(2, 18.1d);
+
+        CoGbkResult result = new CoGbkResult(schema, List.of(
+                trip1Value1, trip2Value1, countsValue1, averageFareValue1));
+
+        KV<String, CoGbkResult> kv = KV.of("77_2021-12-01T13:00:00", result);
+
+        assertThat(new KvToCsvConverter(tripsTag, countsTag, averagesTag).apply(kv))
+                .isEqualTo("77,3,true,12,1,PM,18.1,2");
+    }
+
+    private static Trip createTrip(String id, float fare, int pickupArea, LocalDateTime tripStartHour,
+                                   double pickupLatitude, double pickupLongitude, boolean isUsHoliday) {
+        Trip trip = new Trip(id);
+        trip.setFare(fare);
+        trip.setPickupArea(pickupArea);
+        trip.setTripStartHour(tripStartHour);
+        trip.setPickupLatitude(pickupLatitude);
+        trip.setPickupLongitude(pickupLongitude);
+        trip.setUsHoliday(isUsHoliday);
+        return trip;
     }
 }

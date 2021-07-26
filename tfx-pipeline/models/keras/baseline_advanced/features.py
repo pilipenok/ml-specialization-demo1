@@ -40,7 +40,7 @@ VOCAB_SIZE = 2
 OOV_SIZE = 10
 
 # Keys
-LABEL_KEY = ''
+LABEL_KEY = 'relative_demand'
 
 
 def transformed_name(key: Text) -> Text:

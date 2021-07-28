@@ -19,7 +19,7 @@ This file defines environments for a TFX taxi pipeline.
 
 import os
 
-PIPELINE_NAME = 'tfx-pipeline'
+PIPELINE_NAME = 'tfx-pipeline-ml'
 GOOGLE_CLOUD_PROJECT = 'o-epm-gcp-by-meetup1-ml-t1iylu'
 GCS_BUCKET_NAME = 'chicago-taxi-ml-demo-1'
 GOOGLE_CLOUD_REGION = 'us-central1'

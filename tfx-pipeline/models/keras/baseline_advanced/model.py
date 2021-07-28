@@ -67,34 +67,35 @@ def _build_keras_model() -> tf.keras.Model:
     A keras Model.
     """
     
-    sparse = dict(
-        hour24=tf.feature_column.categorical_column_with_hash_bucket('hour24', 4, dtype=tf.int64),
-        area=tf.feature_column.categorical_column_with_hash_bucket('area', 77, dtype=tf.int64),
-        is_holiday=tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
-        day_of_week=tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', range(7), dtype=tf.int64),
-        month=tf.feature_column.categorical_column_with_vocabulary_list('month', range(12), dtype=tf.int64),
-        day=tf.feature_column.categorical_column_with_vocabulary_list('day', range(31), dtype=tf.int64),
-        hour12=tf.feature_column.categorical_column_with_vocabulary_list('hour12', range(12), dtype=tf.int64),
-        day_period=tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'], dtype=tf.string)
+    real_valued_columns = dict(
+        area = tf.feature_column.numeric_column('area'),
+        avg_total_per_trip_prev4h_area = tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
+        avg_total_per_trip_prev4h_city = tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
+        avg_ntrips_prev_4h_area = tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
+        avg_ntrips_prev_4h_city = tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
     )
     
-    real_valued_columns = dict(
-        avg_total_per_trip_prev4h_area=tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
-        avg_total_per_trip_prev4h_city=tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
-        avg_ntrips_prev_4h_area=tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
-        avg_ntrips_prev_4h_city=tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
+    sparse = dict(
+        hour24 = tf.feature_column.categorical_column_with_hash_bucket('hour24', 4, dtype=tf.int64),
+        # area = tf.feature_column.categorical_column_with_hash_bucket('area', 10, dtype=tf.int64),
+        is_holiday = tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
+        day_of_week = tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', range(7), dtype=tf.int64),
+        month = tf.feature_column.categorical_column_with_vocabulary_list('month', range(12), dtype=tf.int64),
+        day = tf.feature_column.categorical_column_with_vocabulary_list('day', range(31), dtype=tf.int64),
+        hour12 = tf.feature_column.categorical_column_with_vocabulary_list('hour12', range(12), dtype=tf.int64),
+        day_period = tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'], dtype=tf.string)
     )
 
     # Feature Engineering
     sparse.update(
-        is_holiday_day_of_week=tf.feature_column.crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
-        hour12_day_period=tf.feature_column.crossed_column([sparse['hour12'],sparse['day_period']], 12*2)
+        is_holiday_day_of_week = tf.feature_column.crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
+        hour12_day_period = tf.feature_column.crossed_column([sparse['hour12'],sparse['day_period']], 12*2)
     )
 
     embed = dict(
-        area=tf.feature_column.embedding_column(sparse['area'], 4),
-        month=tf.feature_column.embedding_column(sparse['month'], 2),
-        day=tf.feature_column.embedding_column(sparse['day'], 3),
+        area = tf.feature_column.embedding_column(real_valued_columns['area'], 3),
+        month = tf.feature_column.embedding_column(sparse['month'], 2),
+        day = tf.feature_column.embedding_column(sparse['day'], 3),
     )
 
     # one-hot encode the sparse columns
@@ -104,41 +105,42 @@ def _build_keras_model() -> tf.keras.Model:
     }
 
     return _wide_and_deep_classifier_baseline(
-        wide=real_valued_columns,
-        deep=sparse,
+        deep=real_valued_columns,
+        wide=sparse,
         mix=embed
     )
 
 
-def _wide_and_deep_classifier_baseline(wide, deep, mix):
+def _wide_and_deep_classifier_baseline(deep, wide, mix):
     inputs = {f: tf.keras.layers.Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 
     deep = tf.keras.layers.DenseFeatures(deep.values())(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED:
         deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
-        
-    mix = tf.keras.layers.DenseFeatures(mix.values())(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
-        mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
 
     wide = tf.keras.layers.DenseFeatures(wide.values())(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
         wide = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
         
+    mix = tf.keras.layers.DenseFeatures(mix.values())(inputs)
+    for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
+        mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
+        
     x = tf.keras.layers.concatenate([deep, wide])
-    x = tf.keras.layers.Dense(1, activation='sigmoid')(x)
-    x = tf.squeeze(x, -1)
+    x = tf.keras.layers.Dense(1)(x)
+    x = tf.squeeze(x, -1, name='model output')
     outputs = x
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(
-        loss=tf.keras.losses.Huber(),
+        loss=tf.keras.losses.MeanAbsolutePercentageError, # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
         metrics=[
             #'accuracy',
-            tf.keras.metrics.LogCoshError(),
-            tf.keras.metrics.MeanSquaredLogarithmicError(),
-            tf.keras.metrics.MeanAbsolutePercentageError()
+            # tf.keras.metrics.LogCoshError(),
+            # tf.keras.metrics.MeanSquaredLogarithmicError(),
+            tf.keras.metrics.MeanAbsolutePercentageError(),
+            tf.keras.metrics.RootMeanSquaredError()
         ]
     )
     #model.summary(print_fn=logging.info)

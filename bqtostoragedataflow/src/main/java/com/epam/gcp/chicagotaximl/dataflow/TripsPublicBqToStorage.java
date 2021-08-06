@@ -46,8 +46,8 @@ import java.util.List;
 
 /**
  * Apache Beam pipeline.
- * Retrieves data from the public BigQuery table `bigquery-public-data.chicago_taxi_trips.taxi_trips`,
- * and saves it into the Cloud Storage bucket. The subsequent executions will only read
+ * Retrieves data from a public BigQuery table `bigquery-public-data.chicago_taxi_trips.taxi_trips`,
+ * and saves it into a Cloud Storage bucket. The subsequent executions will only read
  * new records.
  */
 public class TripsPublicBqToStorage {
@@ -74,8 +74,8 @@ public class TripsPublicBqToStorage {
         Pipeline p = Pipeline.create(options);
 
         PCollection<Trip> trips = p.apply(
-                        "Reading from BQ",
-                        BigQueryIO.read(new TableRowToTripConverter())
+                    "Fetching a trips",
+                    BigQueryIO.read(new TableRowToTripConverter())
                         .fromQuery(makeQuery(options))
                         .usingStandardSql()
                         .withMethod(Method.DIRECT_READ)
@@ -83,7 +83,7 @@ public class TripsPublicBqToStorage {
                         .withoutValidation());
 
         WriteResult taxiIdInsertsResult = trips.apply(
-                "Writing to BQ",
+                "Saving IDs",
                 BigQueryIO.<Trip>write()
                         .withFormatFunction(new TripToTaxiIdTableRowConverter())
                         .to(StringEscapeUtils.escapeSql(options.getDestinationTable().get()))
@@ -93,11 +93,11 @@ public class TripsPublicBqToStorage {
                         .withMethod(BigQueryIO.Write.Method.DEFAULT));
 
         PCollection<KV<String, Trip>> tripsByKey = trips.apply(
-                "Grouping an elements",
+                "Grouping the trips",
                 WithKeys.of(TripsPublicBqToStorage::makeAreaHourGroupingKey).withKeyType(TypeDescriptors.strings()));
 
         PCollection<KV<String, Double>> averageFares = tripsByKey
-                .apply("Grouping a fares",
+                .apply("Grouping the fares",
                         MapElements.via(
                                 new SimpleFunction<KV<String, Trip>, KV<String, Float>>() {
                                     @Override
@@ -117,7 +117,7 @@ public class TripsPublicBqToStorage {
                 .of(tripsTag, tripsByKey)
                 .and(countsTag, counts)
                 .and(averagesTag, averageFares)
-                .apply("Joining data", CoGroupByKey.create());
+                .apply("Joining the data", CoGroupByKey.create());
 
         PCollection<String> csv = joined.apply(
                 "Converting to CSV format",
@@ -125,7 +125,7 @@ public class TripsPublicBqToStorage {
 
         csv.apply("Waiting BQ inserts to finish",
                 Wait.on(taxiIdInsertsResult.getFailedInserts()))
-            .apply("Saving CSV files",
+            .apply("Saving CSV file",
                 TextIO.write()
                     .to(String.format("%s/trips", options.getOutputDirectory()))
                     .withHeader(CSV_HEADER)

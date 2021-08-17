@@ -10,8 +10,8 @@ import tensorflow_model_analysis as tfma
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 
 from pipeline import configs
-#from models.features import LABEL_KEY
-LABEL_KEY = 'relative_demand'
+from models.keras.baseline_advanced.features import LABEL_KEY
+# LABEL_KEY = 'relative_demand'
 
 from functools import lru_cache
 

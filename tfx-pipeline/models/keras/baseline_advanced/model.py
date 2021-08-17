@@ -2,18 +2,24 @@ from __future__ import division
 from __future__ import print_function
 
 from typing import List
-
 from absl import logging
+
 import tensorflow as tf
-
-from models.keras.baseline_advanced import constants
-
 from tensorflow_metadata.proto.v0 import schema_pb2
 from tfx import v1 as tfx
 from tfx_bsl.public import tfxio
+from tensorflow.feature_column import \
+    numeric_column, \
+    categorical_column_with_identity, \
+    categorical_column_with_vocabulary_list, \
+    categorical_column_with_hash_bucket, \
+    crossed_column, \
+    embedding_column, \
+    indicator_column
+from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate
 
-
-from models.features import FEATURE_SPEC, LABEL_KEY, FEATURE_KEYS, get_schema
+from models.keras.baseline_advanced import constants
+from models.features import FEATURE_KEYS, DENSE_FLOAT_FEATURE_KEYS, LABEL_KEY, FEATURE_SPEC, get_schema
 from pipeline import configs
 
 
@@ -67,40 +73,40 @@ def _build_keras_model() -> tf.keras.Model:
     A keras Model.
     """
     
-    real_valued_columns = dict(
-        area = tf.feature_column.numeric_column('area'),
-        avg_total_per_trip_prev4h_area = tf.feature_column.numeric_column('avg_total_per_trip_prev4h_area'),
-        avg_total_per_trip_prev4h_city = tf.feature_column.numeric_column('avg_total_per_trip_prev4h_city'),
-        avg_ntrips_prev_4h_area = tf.feature_column.numeric_column('avg_ntrips_prev_4h_area'),
-        avg_ntrips_prev_4h_city = tf.feature_column.numeric_column('avg_ntrips_prev_4h_city')
-    )
+    real_valued_columns = {
+        feature: numeric_column(feature) 
+        for feature in DENSE_FLOAT_FEATURE_KEYS
+    }
     
     sparse = dict(
-        hour24 = tf.feature_column.categorical_column_with_hash_bucket('hour24', 4, dtype=tf.int64),
-        # area = tf.feature_column.categorical_column_with_hash_bucket('area', 10, dtype=tf.int64),
-        is_holiday = tf.feature_column.categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
-        day_of_week = tf.feature_column.categorical_column_with_vocabulary_list('day_of_week', range(7), dtype=tf.int64),
-        month = tf.feature_column.categorical_column_with_vocabulary_list('month', range(12), dtype=tf.int64),
-        day = tf.feature_column.categorical_column_with_vocabulary_list('day', range(31), dtype=tf.int64),
-        hour12 = tf.feature_column.categorical_column_with_vocabulary_list('hour12', range(12), dtype=tf.int64),
-        day_period = tf.feature_column.categorical_column_with_vocabulary_list('day_period', ['am', 'pm'], dtype=tf.string)
+        area = categorical_column_with_identity('area', 78),
+        month = categorical_column_with_vocabulary_list('month', range(1,13), dtype=tf.int64),
+        day = categorical_column_with_vocabulary_list('day', range(1,32), dtype=tf.int64),
+        hour = categorical_column_with_identity('hour', 24, dtype=tf.int64),
+        day_period = categorical_column_with_vocabulary_list('day_period', ['am', 'pm'], dtype=tf.string),
+        week = categorical_column_with_identity('week', 54, dtype=tf.int64),
+        day_of_week = categorical_column_with_vocabulary_list('day_of_week', range(1,8), dtype=tf.int64),
+        is_weekend = categorical_column_with_vocabulary_list('is_weekend', ['true', 'false'], dtype=tf.string),
+        is_holiday = categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
     )
 
     # Feature Engineering
     sparse.update(
-        is_holiday_day_of_week = tf.feature_column.crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
-        hour12_day_period = tf.feature_column.crossed_column([sparse['hour12'],sparse['day_period']], 12*2)
+        hour_bucket = categorical_column_with_hash_bucket('hour', 4, dtype=tf.int64),
+        is_holiday_day_of_week = crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
     )
 
     embed = dict(
-        area = tf.feature_column.embedding_column(real_valued_columns['area'], 3),
-        month = tf.feature_column.embedding_column(sparse['month'], 2),
-        day = tf.feature_column.embedding_column(sparse['day'], 3),
+        area = embedding_column(sparse['area'], 4),
+        month = embedding_column(sparse['month'], 2),
+        day = embedding_column(sparse['day'], 3),
+        week = embedding_column(sparse['week'], 4)
+        day_of_week = embedding_column(sparse['day_of_week'], 2),
     )
 
     # one-hot encode the sparse columns
     sparse = {
-        colname: tf.feature_column.indicator_column(col)
+        colname: indicator_column(col)
         for colname, col in sparse.items()
     }
 
@@ -112,28 +118,30 @@ def _build_keras_model() -> tf.keras.Model:
 
 
 def _wide_and_deep_classifier_baseline(deep, wide, mix):
-    inputs = {f: tf.keras.layers.Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
+    inputs = {f: Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 
-    deep = tf.keras.layers.DenseFeatures(deep.values())(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED:
-        deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
+    deep = DenseFeatures(deep.values())(inputs)
+    for numnodes in constants.HIDDEN_UNITS_DEEP_TANH:
+        deep = Dense(numnodes, activation='tanh')(deep)
+    for numnodes in constants.HIDDEN_UNITS_DEEP_RELU:
+        deep = Dense(numnodes, activation='relu')(deep)
 
-    wide = tf.keras.layers.DenseFeatures(wide.values())(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
-        wide = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
+    wide = DenseFeatures(wide.values())(inputs)
+    for numnodes in constants.HIDDEN_UNITS_WIDE:
+        wide = Dense(numnodes, activation='relu')(wide)
         
-    mix = tf.keras.layers.DenseFeatures(mix.values())(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
-        mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
+    mix = DenseFeatures(mix.values())(inputs)
+    for numnodes in constants.HIDDEN_UNITS_MIX:
+        mix = Dense(numnodes, activation='relu')(mix)
         
-    x = tf.keras.layers.concatenate([deep, wide])
-    x = tf.keras.layers.Dense(1)(x)
-    x = tf.squeeze(x, -1, name='model output')
-    outputs = x
+    x = Concatenate()([deep, wide, mix])
+    for numnods in constants.HIDDEN_UNITS:
+        x = Dense(numnodes)(x)
+    outputs = tf.squeeze(x, -1, name='model output')
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(
-        loss=tf.keras.losses.MeanAbsolutePercentageError, # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
+        loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
         metrics=[
             #'accuracy',
@@ -143,25 +151,25 @@ def _wide_and_deep_classifier_baseline(deep, wide, mix):
             tf.keras.metrics.RootMeanSquaredError()
         ]
     )
-    #model.summary(print_fn=logging.info)
+    model.summary(print_fn=logging.info)
     return model
 
 
 def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed_columns):
-    deep = tf.keras.layers.DenseFeatures(deep_columns)(inputs)
+    deep = DenseFeatures(deep_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED:
-        deep = tf.keras.layers.Dense(numnodes, activation='relu')(deep)
+        deep = Dense(numnodes, activation='relu')(deep)
 
-    mix = tf.keras.layers.DenseFeatures(mixed_columns)(inputs)
+    mix = DenseFeatures(mixed_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
-        mix = tf.keras.layers.Dense(numnodes, activation='relu')(mix)
+        mix = Dense(numnodes, activation='relu')(mix)
 
-    wide = tf.keras.layers.DenseFeatures(wide_columns)(inputs)
+    wide = DenseFeatures(wide_columns)(inputs)
     for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
-        widesink = tf.keras.layers.Dense(numnodes, activation='relu')(wide)
+        widesink = Dense(numnodes, activation='relu')(wide)
 
-    output = tf.keras.layers.concatenate([deep, mix, widesink, wide])
-    output = tf.keras.layers.Dense(1, activation='sigmoid')(output)
+    output = concatenate([deep, mix, widesink, wide])
+    output = Dense(1, activation='sigmoid')(output)
     output = tf.squeeze(output, -1)
 
     model = tf.keras.Model(inputs, output)

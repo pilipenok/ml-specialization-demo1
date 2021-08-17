@@ -32,4 +32,20 @@ public class Trip implements Serializable {
   public Trip(String uniqueKey) {
     this.uniqueKey = uniqueKey;
   }
+
+  @Override
+  public int hashCode() {
+    return uniqueKey.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof Trip)) {
+      return false;
+    }
+    return ((Trip) o).getUniqueKey().equals(uniqueKey);
+  }
 }

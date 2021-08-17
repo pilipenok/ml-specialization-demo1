@@ -248,12 +248,11 @@ public class TripsPublicBqToStorage {
     void setDestinationTable(ValueProvider<String> destinationTable);
 
 
-    @Description("The period of time in days, for which the "
-            + "trips should be fetched from the source table.")
-    @Default.Integer(1100)
-    ValueProvider<Integer> getInterval();
+    @Description("A date from which the trips should be fetched from the source table.")
+    @Default.String("2018-08-01")
+    ValueProvider<String> getFromDate();
 
-    void setInterval(ValueProvider<Integer> interval);
+    void setFromDate(ValueProvider<String> date);
 
 
     @Description("Query limit.")
@@ -276,7 +275,7 @@ public class TripsPublicBqToStorage {
             + " LEFT JOIN chicago_taxi_ml_demo_1.national_holidays h "
             + "     ON TIMESTAMP_TRUNC(t.trip_start_timestamp, DAY) = TIMESTAMP_TRUNC(h.date, DAY) "
             + "     AND h.countryRegionCode = 'US' "
-            + " WHERE trip_start_timestamp > TIMESTAMP_SUB(current_timestamp(), INTERVAL %d DAY) "
+            + " WHERE trip_start_timestamp >= TIMESTAMP(\"%s 00:00:00+00\") "
             + " AND t.trip_start_timestamp IS NOT NULL "
             + " AND t.trip_end_timestamp IS NOT NULL "
             + " AND t.pickup_community_area IS NOT NULL "
@@ -288,10 +287,9 @@ public class TripsPublicBqToStorage {
             + "       ST_COVERS(b.boundaries, ST_GEOGPOINT(t.pickup_longitude, t.pickup_latitude)) "
             + "       FROM `chicago_taxi_ml_demo_1.chicago_boundaries` b) = True "
             + " LIMIT %d",
-            StringEscapeUtils.escapeSql(options.getSourceTable().get()),
-            options.getInterval().get(),
-            StringEscapeUtils.escapeSql(options.getDestinationTable().get()),
-            options.getLimit().get()
-    );
+    StringEscapeUtils.escapeSql(options.getSourceTable().get()),
+    options.getFromDate().get(),
+    StringEscapeUtils.escapeSql(options.getDestinationTable().get()),
+    options.getLimit().get());
   }
 }

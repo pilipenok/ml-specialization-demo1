@@ -10,12 +10,12 @@ mvn clean compile exec:java -Dexec.mainClass=com.epam.gcp.chicagotaximl.dataflow
     --templateLocation=gs://chicago-taxi-dataflow/public-bq-to-bq/template \
     --sourceTable=chicago_taxi_ml_demo_1.taxi_trips_sample \
     --limit=10000 \
-    --interval=5000 \
+    --fromDate=2018-08-01 \
     --destinationTable=chicago_taxi_ml_demo_1.taxi_id \
     --outputDirectory=gs://chicago-taxi-ml-demo-1/trips"
 
 # Stage the pipeline in the Cloud Dataflow:
-mvn -Pdataflow-runner exec:java -Dexec.mainClass=com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage \
+mvn -Pdataflow-runner clean compile exec:java -Dexec.mainClass=com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage \
 -Dexec.cleanupDaemonThreads=false -Dexec.args="\
     --project=o-epm-gcp-by-meetup1-ml-t1iylu \
     --tempLocation=gs://chicago-taxi-dataflow-temp-files/public-bq-to-bq \
@@ -26,7 +26,7 @@ mvn -Pdataflow-runner exec:java -Dexec.mainClass=com.epam.gcp.chicagotaximl.data
     --templateLocation=gs://chicago-taxi-dataflow/public-bq-to-bq/template \
     --sourceTable=chicago_taxi_ml_demo_1.taxi_trips_view \
     --limit=2000000000 \
-    --interval=1100 \
+    --fromDate=2018-08-01 \
     --destinationTable=chicago_taxi_ml_demo_1.taxi_id \
     --outputDirectory=gs://chicago-taxi-ml-demo-1/trips \
     --flexRSGoal=COST_OPTIMIZED"

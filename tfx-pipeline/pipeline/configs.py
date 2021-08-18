@@ -18,6 +18,7 @@ This file defines environments for a TFX taxi pipeline.
 """
 
 import os
+import tfx
 
 PIPELINE_NAME = 'tfx-pipeline'
 GOOGLE_CLOUD_PROJECT = 'o-epm-gcp-by-meetup1-ml-t1iylu'
@@ -41,6 +42,8 @@ EVAL_NUM_STEPS = 1000
 EVAL_ACCURACY_THRESHOLD = 0.6
 TRAIN_BATCH_SIZE = 128
 EVAL_BATCH_SIZE = 128
+
+USE_GPU = False
 
 # A dict which contains the training job parameters to be passed to Google
 # Cloud AI Platform. For the full set of parameters supported by Google Cloud AI
@@ -83,3 +86,35 @@ PIPELINE_ROOT = f'{OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
 # The last component of the pipeline, "Pusher" will produce serving model under
 # SERVING_MODEL_DIR.
 SERVING_MODEL_DIR = f'{PIPELINE_ROOT}/serving_model'
+
+# NEW: Configuration for Vertex AI Training.
+# This dictionary will be passed as `CustomJobSpec`.
+GCP_VERTEX_AI_TRAINING_ARGS = {
+    'project': GOOGLE_CLOUD_PROJECT,
+    'region': GOOGLE_CLOUD_REGION,
+    # Starting from TFX 0.14, training on AI Platform uses custom containers:
+    # https://cloud.google.com/ml-engine/docs/containers-overview
+    # You can specify a custom container here. If not specified, TFX will use
+    # a public container image matching the installed version of TFX.
+    'masterConfig': {
+      'imageUri': PIPELINE_IMAGE
+    },
+    # Note that if you do specify a custom container, ensure the entrypoint
+    # calls into TFX's run_executor script (tfx/scripts/run_executor.py)
+    
+    'worker_pool_specs': [{
+        'machine_spec': {'machine_type': 'n1-standard-4',},
+        'replica_count': 1,
+        'container_spec': {
+            'image_uri': 'gcr.io/tfx-oss-public/tfx:{}'.format(tfx.__version__),
+        },
+    }],
+}
+
+if USE_GPU:
+    # See https://cloud.google.com/vertex-ai/docs/reference/rest/v1/MachineSpec#acceleratortype
+    # for available machine types.
+    GCP_VERTEX_AI_TRAINING_ARGS['worker_pool_specs'][0]['machine_spec'].update({
+        'accelerator_type': 'NVIDIA_TESLA_K80',
+        'accelerator_count': 1
+    })

@@ -26,7 +26,7 @@ GCS_BUCKET_NAME = 'chicago-taxi-ml-demo-1'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
-DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/'
+DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/test'
 #DATA_PATH = 'data/'
 
 # Following image will be used to run pipeline components run if Kubeflow

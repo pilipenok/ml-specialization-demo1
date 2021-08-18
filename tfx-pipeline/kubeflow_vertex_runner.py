@@ -31,7 +31,8 @@ def run():
         project_id=configs.GOOGLE_CLOUD_PROJECT,
         region=configs.GOOGLE_CLOUD_REGION
     ).create_run_from_job_spec(
-        PIPELINE_DEFINITION_FILE
+        PIPELINE_DEFINITION_FILE,
+        enable_caching=False
     )
 
 

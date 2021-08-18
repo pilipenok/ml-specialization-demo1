@@ -26,7 +26,7 @@ from tfx.orchestration import pipeline
 
 from ml_metadata.proto import metadata_store_pb2
 
-from pipeline.components import example_gen, statistics_gen, schema_gen, example_validator, transform, trainer, model_resolver, evaluator, pusher
+from pipeline.components import example_gen, statistics_gen, schema_gen, example_validator, transform, trainer_vertex as trainer, model_resolver, evaluator, pusher
 
 
 def create_pipeline(

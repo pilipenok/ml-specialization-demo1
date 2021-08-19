@@ -69,7 +69,7 @@ VOCAB_SIZE = 2
 OOV_SIZE = 10
 
 # Keys
-LABEL_KEY = 'log_n_trips' # 'n_trips' # 
+LABEL_KEY = 'n_trips' # 'log_n_trips' # 
 
 
 def transformed_name(key: Text) -> Text:

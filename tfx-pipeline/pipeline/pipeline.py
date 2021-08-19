@@ -51,11 +51,9 @@ def create_pipeline(
         example_gen=_example_gen, 
         schema_gen=_schema_gen
     )
-    _model_resolver = model_resolver(),
     _evaluator = evaluator(
         example_gen=_example_gen,
-        trainer=_trainer,
-        model_resolver=_model_resolver
+        trainer=_trainer
     )
     _pusher = pusher(
         trainer=_trainer
@@ -68,7 +66,7 @@ def create_pipeline(
         _example_validator,
         #_transform,
         _trainer,
-        _model_resolver,
+        #_model_resolver,
         _evaluator,
         _pusher
     ]

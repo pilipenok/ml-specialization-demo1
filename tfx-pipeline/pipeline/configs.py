@@ -20,13 +20,13 @@ This file defines environments for a TFX taxi pipeline.
 import os
 import tfx
 
-PIPELINE_NAME = 'tfx-pipeline'
+PIPELINE_NAME = 'tfx-pipeline-ml'
 GOOGLE_CLOUD_PROJECT = 'o-epm-gcp-by-meetup1-ml-t1iylu'
 GCS_BUCKET_NAME = 'chicago-taxi-ml-demo-1'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
-DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/test'
+DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/test/'
 #DATA_PATH = 'data/'
 
 # Following image will be used to run pipeline components run if Kubeflow
@@ -40,11 +40,10 @@ RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 TRAIN_NUM_STEPS = 100000
 EVAL_NUM_STEPS = 1000
 EVAL_ACCURACY_THRESHOLD = 0.6
-TRAIN_BATCH_SIZE = 128
-EVAL_BATCH_SIZE = 128
+TRAIN_BATCH_SIZE = 64
+EVAL_BATCH_SIZE = 64
 
 USE_GPU = False
-
 # A dict which contains the training job parameters to be passed to Google
 # Cloud AI Platform. For the full set of parameters supported by Google Cloud AI
 # Platform, refer to https://cloud.google.com/ml-engine/reference/rest/v1/projects.jobs#Job
@@ -101,7 +100,7 @@ GCP_VERTEX_AI_TRAINING_ARGS = {
     },
     # Note that if you do specify a custom container, ensure the entrypoint
     # calls into TFX's run_executor script (tfx/scripts/run_executor.py)
-    
+
     'worker_pool_specs': [{
         'machine_spec': {'machine_type': 'n1-standard-4',},
         'replica_count': 1,

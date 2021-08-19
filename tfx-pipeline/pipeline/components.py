@@ -1,22 +1,18 @@
-import tfx
 from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Trainer, Evaluator, Pusher
 from tfx.proto import trainer_pb2
 from tfx.dsl.components.base import executor_spec
-
-from tfx.extensions.google_cloud_ai_platform.trainer.component import Trainer as GCP_AI_Trainer
 from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
-from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
-from tfx.extensions.google_cloud_ai_platform.trainer.executor import ENABLE_VERTEX_KEY, VERTEX_REGION_KEY, TRAINING_ARGS_KEY
-
 from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.types import Channel
 from tfx.types.standard_artifacts import Model, ModelBlessing
 import tensorflow_model_analysis as tfma
+from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 
 from pipeline import configs
-#from models.features import LABEL_KEY
-LABEL_KEY = 'relative_demand'
+# from models.keras.baseline_advanced.features import LABEL_KEY
+from models.features import LABEL_KEY
+# LABEL_KEY = 'relative_demand'
 
 from functools import lru_cache
 
@@ -108,7 +104,7 @@ def trainer_vertex(
     return GCP_AI_Trainer(
         #module_file=module_file,
         run_fn=configs.RUN_FN,
-        
+
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
         train_args=tfx.proto.trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
@@ -119,7 +115,7 @@ def trainer_vertex(
             TRAINING_ARGS_KEY: configs.GCP_VERTEX_AI_TRAINING_ARGS,
             'use_gpu': configs.USE_GPU
         })
-    
+
 
 @lru_cache(maxsize=None)
 def model_resolver():
@@ -145,15 +141,17 @@ def evaluator(
         slicing_specs=[tfma.SlicingSpec()],
         metrics_specs=[
             tfma.MetricsSpec(metrics=[
-                tfma.MetricConfig(
-                    class_name='BinaryAccuracy',
-                    threshold=tfma.MetricThreshold(
-                        value_threshold=tfma.GenericValueThreshold(
-                            lower_bound={'value': configs.EVAL_ACCURACY_THRESHOLD}),
-                        change_threshold=tfma.GenericChangeThreshold(direction=tfma.MetricDirection.HIGHER_IS_BETTER,
-                                                                     absolute={'value': -1e-10})
-                    )
-                )
+                # tfma.MetricConfig(
+                #     class_name='BinaryAccuracy',
+                #     threshold=tfma.MetricThreshold(
+                #         value_threshold=tfma.GenericValueThreshold(
+                #             lower_bound={'value': configs.EVAL_ACCURACY_THRESHOLD}),
+                #         change_threshold=tfma.GenericChangeThreshold(direction=tfma.MetricDirection.HIGHER_IS_BETTER,
+                #                                                      absolute={'value': -1e-10})
+                #     )
+                # )
+                tfma.MetricConfig(class_name='RootMeanSquaredError'),
+                tfma.MetricConfig(class_name='MeanAbsolutePercentageError')
             ])
         ])
 

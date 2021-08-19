@@ -1,13 +1,17 @@
+import tfx
 from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Trainer, Evaluator, Pusher
 from tfx.proto import trainer_pb2
 from tfx.dsl.components.base import executor_spec
-from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
 from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.types import Channel
 from tfx.types.standard_artifacts import Model, ModelBlessing
 import tensorflow_model_analysis as tfma
+
+from tfx.extensions.google_cloud_ai_platform.trainer.component import Trainer as GCP_AI_Trainer
+from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
+from tfx.extensions.google_cloud_ai_platform.trainer.executor import ENABLE_VERTEX_KEY, VERTEX_REGION_KEY, TRAINING_ARGS_KEY
 
 from pipeline import configs
 # from models.keras.baseline_advanced.features import LABEL_KEY

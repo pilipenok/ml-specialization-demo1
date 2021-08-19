@@ -39,8 +39,8 @@ RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 TRAIN_NUM_STEPS = 100000
 EVAL_NUM_STEPS = 1000
 EVAL_ACCURACY_THRESHOLD = 0.6
-TRAIN_BATCH_SIZE = 16
-EVAL_BATCH_SIZE = 16
+TRAIN_BATCH_SIZE = 64
+EVAL_BATCH_SIZE = 64
 
 # A dict which contains the training job parameters to be passed to Google
 # Cloud AI Platform. For the full set of parameters supported by Google Cloud AI

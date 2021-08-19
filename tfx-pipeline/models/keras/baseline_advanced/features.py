@@ -17,6 +17,9 @@ import tensorflow_transform as tft
 from pipeline import components
 
 
+# Keys
+LABEL_KEY = 'n_trips' # 'log_n_trips' # 
+
 FEATURE_KEYS = \
    "area,year,"\
    "quarter,quarter_num,quarter_cos,quarter_sin,"\
@@ -67,9 +70,6 @@ VOCAB_FEATURE_KEYS = []
 VOCAB_SIZE = 2
 # Count of out-of-vocab buckets in which unrecognized VOCAB_FEATURES are hashed.
 OOV_SIZE = 10
-
-# Keys
-LABEL_KEY = 'n_trips' # 'log_n_trips' # 
 
 
 def transformed_name(key: Text) -> Text:

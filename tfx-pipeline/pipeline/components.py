@@ -10,9 +10,7 @@ import tensorflow_model_analysis as tfma
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 
 from pipeline import configs
-# from models.keras.baseline_advanced.features import LABEL_KEY
-from models.features import LABEL_KEY
-# LABEL_KEY = 'relative_demand'
+from models.keras.baseline_advanced import features
 
 from functools import lru_cache
 
@@ -110,7 +108,7 @@ def evaluator(
     # perform quality validation of a candidate model (compared to a baseline).
 
     eval_config = tfma.EvalConfig(
-        model_specs=[tfma.ModelSpec(label_key=LABEL_KEY)],
+        model_specs=[tfma.ModelSpec(label_key=features.LABEL_KEY)],
         slicing_specs=[tfma.SlicingSpec()],
         metrics_specs=[
             tfma.MetricsSpec(metrics=[

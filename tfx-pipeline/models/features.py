@@ -32,8 +32,7 @@ import tensorflow_transform as tft
 FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
 
 
-# LABEL_KEY = 'relative_demand'
-LABEL_KEY = 'n_trips'
+LABEL_KEY = 'relative_demand'
 
 
 # Since we're not generating or creating a schema, we will instead create a feature spec.

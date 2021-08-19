@@ -36,6 +36,7 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
+MODULE_FILE = os.join(os.path.dirname(__file__), '../keras/baseline_advanced/model.py')
 
 TRAIN_NUM_STEPS = 100000
 EVAL_NUM_STEPS = 1000

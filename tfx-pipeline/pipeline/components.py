@@ -106,8 +106,8 @@ def trainer_vertex(
     # Trains a model using Vertex AI Training.
     # NEW: We need to specify a Trainer for GCP with related configs.
     return GCP_AI_Trainer(
-        #module_file=module_file,
-        run_fn=configs.RUN_FN,
+        module_file=configs.MODULE_FILE,
+        #run_fn=configs.RUN_FN,
 
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],

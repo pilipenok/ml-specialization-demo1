@@ -26,7 +26,7 @@ GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
 DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/small/'
-#DATA_PATH = 'data/'
+#DATA_PATH = 'data/' # local path
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -36,11 +36,11 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 
-TRAIN_NUM_STEPS = 100000
-EVAL_NUM_STEPS = 1000
-EVAL_ACCURACY_THRESHOLD = 0.6
-TRAIN_BATCH_SIZE = 16
-EVAL_BATCH_SIZE = 16
+# TRAIN_NUM_STEPS = 100000
+# EVAL_NUM_STEPS = 1000
+# EVAL_ACCURACY_THRESHOLD = 0.6
+# TRAIN_BATCH_SIZE = 16
+# EVAL_BATCH_SIZE = 16
 
 # A dict which contains the training job parameters to be passed to Google
 # Cloud AI Platform. For the full set of parameters supported by Google Cloud AI

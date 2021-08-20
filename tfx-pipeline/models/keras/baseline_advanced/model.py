@@ -1,13 +1,14 @@
 from __future__ import division
 from __future__ import print_function
 
+import os
 from typing import List
 from absl import logging
 
-import tensorflow as tf
-from tensorflow_metadata.proto.v0 import schema_pb2
 from tfx import v1 as tfx
 from tfx_bsl.public import tfxio
+import tensorflow as tf
+from tensorflow_metadata.proto.v0 import schema_pb2
 from tensorflow.feature_column import \
     numeric_column, \
     categorical_column_with_identity, \
@@ -16,11 +17,10 @@ from tensorflow.feature_column import \
     crossed_column, \
     embedding_column, \
     indicator_column
-from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate
+from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate, Lambda
 
 from models.keras.baseline_advanced import constants
-from models.keras.baseline_advanced.features import FEATURE_KEYS, DENSE_FLOAT_FEATURE_KEYS, LABEL_KEY, FEATURE_SPEC, get_schema
-from pipeline import configs
+from models.keras.baseline_advanced.features import LABEL_KEY, FEATURE_KEYS, DENSE_FLOAT_FEATURE_KEYS, FEATURE_SPEC, get_schema
 
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
@@ -110,12 +110,19 @@ def _build_keras_model() -> tf.keras.Model:
         colname: indicator_column(col)
         for colname, col in sparse.items()
     }
-
-    return _wide_and_deep_classifier_baseline(
-        deep=real_valued_columns,
-        wide=sparse,
-        mix=embed
-    )
+    
+    if constants.baseline:
+        return _wide_and_deep_classifier_baseline(
+            deep=real_valued_columns,
+            wide=sparse,
+            mix=embed
+        )
+    else:
+        return _wide_and_deep_classifier_advanced(
+            deep=real_valued_columns,
+            wide=sparse,
+            mix=embed
+        )
 
 
 def _wide_and_deep_classifier_baseline(deep, wide, mix):
@@ -141,17 +148,13 @@ def _wide_and_deep_classifier_baseline(deep, wide, mix):
         mix_idx += 1
         mix = Dense(numnodes, activation='relu', name='mix_'+str(mix_idx))(mix)
         
-    x = Concatenate()([deep, wide, mix])
-    for numnodes in constants.HIDDEN_UNITS:
+    concat = Concatenate()([deep, wide, mix])
+    for numnodes in constants.HIDDEN_UNITS_CONCAT:
         concat_idx += 1
-        x = Dense(numnodes, name='concat_'+str(concat_idx))(x)
+        concat = Dense(numnodes, name='concat_'+str(concat_idx))(concat)
     
-    try:
-        logging.debug(f"output shape of the last dense layer = {x.output_shape()}")
-        outputs = tf.squeeze(x, -1, name='model_output')
-    except Exception as e:
-        logging.error(f"{e.__class__}: {e}")
-        outputs = x
+    outputs = tf.squeeze(concat, -1, name='model_output')
+#     outputs = Lambda(lambda x: x, name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(
@@ -218,27 +221,53 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     schema = get_schema()
 
-    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, configs.TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, configs.EVAL_BATCH_SIZE)
-
+    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, constants.TRAIN_BATCH_SIZE)
+    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, constants.EVAL_BATCH_SIZE)
+    
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         model = _build_keras_model()
 
+    earlystopping_callback = tf.keras.callbacks.EarlyStopping(
+        monitor='val_mean_absolute_percentage_error', 
+        patience=constants.ES_PATIENCE,
+        restore_best_weights=True, 
+        verbose=1
+    )
     # Write logs to path
+    tb_logdir = os.path.join(
+        fn_args.model_run_dir[:fn_args.model_run_dir.rfind('/')], 
+        f"{constants.MODEL_NAME} ({fn_args.model_run_dir[fn_args.model_run_dir.rfind('/')+1:]})"
+    )
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=fn_args.model_run_dir/constants.MODEL_NAME, 
-        update_freq='batch'
+        log_dir=tb_logdir,
+        update_freq=10,#'batch',#
+        histogram_freq=1,
+        embeddings_freq=1,
     )
 
     model.fit(
         train_dataset,
         epochs=constants.EPOCHS,
-        steps_per_epoch=fn_args.train_steps,
+#         steps_per_epoch=fn_args.train_steps,
+        steps_per_epoch=constants.TRAIN_NUM_STEPS,
         validation_data=eval_dataset,
-        validation_steps=fn_args.eval_steps,
-        callbacks=[tensorboard_callback]
+#         validation_steps=fn_args.eval_steps,
+        validation_steps=constants.EVAL_NUM_STEPS,
+        callbacks=[
+            earlystopping_callback,
+            tensorboard_callback,
+        ]
     )
+    
+    logging.info("DNN architecture:\n"
+                 f"\tHIDDEN_UNITS_DEEP_TANH = {constants.HIDDEN_UNITS_DEEP_TANH}\n"
+                 f"\tHIDDEN_UNITS_DEEP_RELU = {constants.HIDDEN_UNITS_DEEP_RELU}\n"
+                 f"\tHIDDEN_UNITS_WIDE = {constants.HIDDEN_UNITS_WIDE}\n"
+                 f"\tHIDDEN_UNITS_MIX = {constants.HIDDEN_UNITS_MIX}\n"
+                 f"\tHIDDEN_UNITS_CONCAT = {constants.HIDDEN_UNITS_CONCAT}"
+    )
+    logging.info(f"TensorBoard log directory: {tb_logdir}")
 
     # signatures = {
     #     'serving_default':

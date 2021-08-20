@@ -18,7 +18,8 @@ from pipeline import components
 
 
 # Keys
-LABEL_KEY = 'n_trips' # 'log_n_trips' # 
+from models.keras.baseline_advanced.constants import LABEL_KEY
+# LABEL_KEY = 'n_trips' # 'log_n_trips' # 
 
 FEATURE_KEYS = \
    "area,year,"\

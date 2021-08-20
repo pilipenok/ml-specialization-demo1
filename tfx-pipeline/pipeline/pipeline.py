@@ -26,7 +26,7 @@ from tfx.orchestration import pipeline
 
 from ml_metadata.proto import metadata_store_pb2
 
-from pipeline.components import example_gen, statistics_gen, schema_gen, example_validator, transform, trainer, model_resolver, evaluator, pusher
+from pipeline.components import *
 
 
 def create_pipeline(
@@ -77,6 +77,6 @@ def create_pipeline(
         pipeline_root=pipeline_root,
         components=components,
         # Change this value to control caching of execution results. Default value
-        enable_cache=True,
+        enable_cache=False,
         metadata_connection_config=metadata_connection_config,
     )

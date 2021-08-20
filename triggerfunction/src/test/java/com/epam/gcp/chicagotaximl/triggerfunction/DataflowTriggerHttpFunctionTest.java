@@ -37,7 +37,8 @@ public class DataflowTriggerHttpFunctionTest {
       + " 'gcs-path': 'my-gcs-path',"
       + " 'temp-location': 'my-temp-location',"
       + " 'service-account': 'my-service-account',"
-      + " 'region': 'my-region'"
+      + " 'region': 'my-region',"
+      + " 'dataset': 'my-dataset'"
       + "}");
   private static final String REQUEST_NO_CHECK_TIME = requestBuilder.toString();
   private static final String REQUEST_CHECK_TIME_FALSE = requestBuilder.insert(

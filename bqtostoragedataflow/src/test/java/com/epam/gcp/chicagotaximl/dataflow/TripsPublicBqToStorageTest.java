@@ -41,8 +41,10 @@ class TripsPublicBqToStorageTest {
 
   @Test
   void testMakeAreaHourGroupingKey() {
-    Trip trip = createTrip("tripid", 20.18f, 77, LocalDateTime.of(2021, 5, 10, 19, 0), 41.55555, -87.999999, false);
-    assertThat(TripsPublicBqToStorage.makeAreaHourGroupingKey(trip)).isEqualTo("77_2021-05-10T19:00");
+    Trip trip = createTrip("tripid", 20.18f, 77,
+        LocalDateTime.of(2021, 5, 10, 19, 0), 41.55555, -87.999999, false);
+    assertThat(TripsPublicBqToStorage.makeAreaHourGroupingKey(trip))
+        .isEqualTo("77_2021-05-10T19:00");
   }
 
   @Test

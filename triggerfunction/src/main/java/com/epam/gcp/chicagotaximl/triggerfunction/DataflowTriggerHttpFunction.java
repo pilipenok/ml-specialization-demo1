@@ -59,7 +59,8 @@ public class DataflowTriggerHttpFunction implements HttpFunction {
           body.get("gcs-path").getAsString(),
           body.get("temp-location").getAsString(),
           body.get("service-account").getAsString(),
-          body.get("region").getAsString());
+          body.get("region").getAsString(),
+          body.get("dataset").getAsString());
 
       if (checkLastModifiedTime) {
         LOGGER.info("Checking last_modified_time");

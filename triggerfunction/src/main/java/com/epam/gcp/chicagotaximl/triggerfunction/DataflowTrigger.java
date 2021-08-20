@@ -16,6 +16,7 @@ import com.google.dataflow.v1beta3.CreateJobFromTemplateRequest;
 import com.google.dataflow.v1beta3.RuntimeEnvironment;
 import java.util.HashMap;
 import lombok.AllArgsConstructor;
+import org.apache.commons.lang.StringEscapeUtils;
 
 /**
  * Checks if the public BigQuery table `taxi_trips` has been modified. If so, runs the
@@ -32,6 +33,7 @@ public class DataflowTrigger {
   private final String tempLocation;
   private final String serviceAccount;
   private final String region;
+  private final String dataset;
 
   // public_dataset_tables is a view for table bigquery-public-data.chicago_taxi_trips.__TABLES__,
   // which is a system table and contains information about tables in a dataset.
@@ -41,13 +43,12 @@ public class DataflowTrigger {
   // 7 minutes) or the table taxi_id is empty.
   private static final String QUERY =
       "SELECT last_modified_time "
-          + "FROM `chicago_taxi_ml_demo_1.public_dataset_tables` "
+          + "FROM `%1$s.public_dataset_tables` "
           + "WHERE table_id = 'taxi_trips' "
           + "AND (TIMESTAMP_MILLIS(last_modified_time) > "
           + "         (SELECT TIMESTAMP_SUB(MAX(processed_timestamp), INTERVAL 7 MINUTE) "
-          + "           FROM `chicago_taxi_ml_demo_1.taxi_id`) "
-          + "      OR (SELECT processed_timestamp FROM `chicago_taxi_ml_demo_1.taxi_id` LIMIT 1) "
-          + "             IS NULL "
+          + "           FROM `%1$s.processed_trips`) "
+          + "      OR (SELECT processed_timestamp FROM `%1$s.processed_trips` LIMIT 1) IS NULL "
           + "     )";
 
   /**
@@ -55,7 +56,8 @@ public class DataflowTrigger {
    * has been modified since previous Dataflow run.
    */
   public boolean checkLastModifiedTime() throws InterruptedException {
-    Builder queryBuilder = QueryJobConfiguration.newBuilder(QUERY);
+    Builder queryBuilder = QueryJobConfiguration.newBuilder(
+        String.format(QUERY, StringEscapeUtils.escapeSql(dataset)));
     TableResult results = bigquery.query(queryBuilder.build());
     return results.getTotalRows() > 0;
   }

@@ -8,6 +8,6 @@ gcloud functions deploy chicago-taxi-ml-demo-1-trigger \
 --trigger-http \
 --memory=256MB \
 --security-level=secure-always \
---service-account=chicago-taxi-ml-deml-1-trigger@o-epm-gcp-by-meetup1-ml-t1iylu.iam.gserviceaccount.com \
+--service-account=<SERVICE_ACCOUNT> \
 --max-instances=1 \
 --ingress-settings=all

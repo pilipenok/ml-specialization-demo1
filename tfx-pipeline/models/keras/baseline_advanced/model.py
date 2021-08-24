@@ -91,12 +91,16 @@ def _build_keras_model() -> tf.keras.Model:
         is_weekend = categorical_column_with_vocabulary_list('is_weekend', ['true', 'false'], dtype=tf.string),
         is_holiday = categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
     )
-
-    # Feature Engineering
     sparse.update(
 #         hour_bucket = categorical_column_with_hash_bucket('hour', 4, dtype=tf.int64),
         is_holiday_day_of_week = crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
     )
+    # one-hot encode the sparse columns
+    sparse = {
+        colname: indicator_column(col)
+        for colname, col in sparse.items()
+    }
+    
     embed = dict(
         area_emb = embedding_column(sparse['area'], 4),
         quarter_emb = embedding_column(sparse['quarter'], 2),
@@ -105,56 +109,40 @@ def _build_keras_model() -> tf.keras.Model:
         week_emb = embedding_column(sparse['week'], 4),
         day_of_week_emb = embedding_column(sparse['day_of_week'], 2),
     )
-
-    # one-hot encode the sparse columns
-    sparse = {
-        colname: indicator_column(col)
-        for colname, col in sparse.items()
-    }
     
     if constants.baseline:
         return _wide_and_deep_classifier_baseline(
-            deep=real_valued_columns,
+            deep={**real_valued_columns, **embed},
             wide=sparse,
-            mix=embed
         )
     else:
         return _wide_and_deep_classifier_advanced(
             deep=real_valued_columns,
+            embed=embed,
             wide=sparse,
-            mix=embed
+            regularizer=False,
+            dropout=False
         )
 
 
-def _wide_and_deep_classifier_baseline(deep, wide, mix):
-    deep_idx, wide_idx, mix_idx, concat_idx = 0, 0, 0, 0
+def _wide_and_deep_classifier_baseline(deep, wide):
+    deep_idx, concat_idx = 0, 0
     
     inputs = {f: Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 
     deep = DenseFeatures(deep.values(), name='deep_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_DEEP_TANH:
-        deep_idx += 1
-        deep = Dense(numnodes, activation='tanh', name='deep_'+str(deep_idx))(deep)
-    for numnodes in constants.HIDDEN_UNITS_DEEP_RELU:
+    for numnodes in constants.HIDDEN_UNITS_BASE_DEEP:
         deep_idx += 1
         deep = Dense(numnodes, activation='relu', name='deep_'+str(deep_idx))(deep)
 
     wide = DenseFeatures(wide.values(), name='wide_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_WIDE:
-        wide_idx += 1
-        wide = Dense(numnodes, activation='relu', name='wide_'+str(wide_idx))(wide)
-        
-    mix = DenseFeatures(mix.values(), name='mix_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_MIX:
-        mix_idx += 1
-        mix = Dense(numnodes, activation='relu', name='mix_'+str(mix_idx))(mix)
-        
-    concat = Concatenate()([deep, wide, mix])
-    for numnodes in constants.HIDDEN_UNITS_CONCAT[:-1]:
-        concat_idx += 1
-        concat = Dense(numnodes, name='concat_'+str(concat_idx))(concat)
     
-    outputs = Dense(constants.HIDDEN_UNITS_CONCAT[-1], name='model_output')(concat)
+    concat = Concatenate()([deep, wide])
+    for numnodes in constants.HIDDEN_UNITS_BASE_CONCAT[:-1]:
+        concat_idx += 1
+        concat = Dense(numnodes, activation='sigm', name='concat_'+str(concat_idx))(concat)
+    
+    outputs = Dense(constants.HIDDEN_UNITS_BASE_CONCAT[-1], name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(
@@ -171,55 +159,61 @@ def _wide_and_deep_classifier_baseline(deep, wide, mix):
     return model
 
 
-def _wide_and_deep_classifier_advanced(deep, wide, mix):
-    deep_idx, wide_idx, mix_idx, concat_idx = 0, 0, 0, 0
+def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dropout=False):
+    deep_idx, embed_idx, wide_idx, mix_idx, concat_idx = 0, 0, 0, 0, 0
     
     inputs = {f: Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 
     deep = DenseFeatures(deep.values(), name='deep_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_DEEP_TANH:
+    for numnodes in constants.HIDDEN_UNITS_ADV_DEEP:
         deep_idx += 1
         deep = Dense(
             numnodes, activation='tanh', 
-            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='deep_'+str(deep_idx)
         )(deep)
-        deep = Dropout(0.5, name=f"dropout_deep_{deep_idx}")(deep)
-    for numnodes in constants.HIDDEN_UNITS_DEEP_RELU:
-        deep_idx += 1
-        deep = Dense(
+        if dropout:
+            deep = Dropout(0.5, name=f"dropout_deep_{deep_idx}")(deep)
+        
+    embed = DenseFeatures(embed.values(), name='embed_inputs')(inputs)
+    for numnodes in constants.HIDDEN_UNITS_ADV_EMBED:
+        embed_idx += 1
+        embed = Dense(
             numnodes, activation='relu', 
-            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
-            name='deep_'+str(deep_idx)
-        )(deep)
-        deep = Dropout(0.5, name=f"dropout_deep_{deep_idx}")(deep)
+            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            name='embed_'+str(embed_idx)
+        )(embed)
+        if dropout:
+            embed = Dropout(0.5, name=f"dropout_embed_{embed_idx}")(embed)
+    
+    mix = Concatenate()([deep, embed])
+    for numnodes in constants.HIDDEN_UNITS_ADV_MIX:
+        mix_idx += 1
+        mix = Dense(
+            numnodes, activation='tanh', 
+            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            name='mix_'+str(mix_idx)
+        )(mix)
+        if dropout:
+            mix = Dropout(0.5, name=f"dropout_mix_{mix_idx}")(mix)
 
     wide = DenseFeatures(wide.values(), name='wide_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_WIDE:
+    for numnodes in constants.HIDDEN_UNITS_ADV_WIDE:
         wide_idx += 1
         wide = Dense(
             numnodes, activation='relu', 
-            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='wide_'+str(wide_idx)
         )(wide)
-        wide = Dropout(0.5, name=f"dropout_wide_{wide_idx}")(wide)
+        if dropout:
+            wide = Dropout(0.5, name=f"dropout_wide_{wide_idx}")(wide)
         
-    mix = DenseFeatures(mix.values(), name='mix_inputs')(inputs)
-    for numnodes in constants.HIDDEN_UNITS_MIX:
-        mix_idx += 1
-        mix = Dense(
-            numnodes, activation='relu', 
-            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
-            name='mix_'+str(mix_idx)
-        )(mix)
-        mix = Dropout(0.5, name=f"dropout_mix_{mix_idx}")(mix)
-        
-    concat = Concatenate()([deep, wide, mix])
-    for numnodes in constants.HIDDEN_UNITS_CONCAT[:-1]:
+    concat = Concatenate()([wide, mix])
+    for numnodes in constants.HIDDEN_UNITS_ADV_CONCAT[:-1]:
         concat_idx += 1
-        concat = Dense(numnodes, name='concat_'+str(concat_idx))(concat)
+        concat = Dense(numnodes, activation='tanh', name='concat_'+str(concat_idx))(concat)
     
-    outputs = Dense(constants.HIDDEN_UNITS_CONCAT[-1], name='model_output')(concat)
+    outputs = Dense(constants.HIDDEN_UNITS_ADV_CONCAT[-1], name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(

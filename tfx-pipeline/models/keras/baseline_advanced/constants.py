@@ -3,7 +3,7 @@
 These values can be tweaked to affect model training performance.
 """
 
-baseline = True # False # 
+baseline = False # True # 
 LABEL_KEY = 'n_trips' # 'log_n_trips' # 
 
 EPOCHS = 25
@@ -14,14 +14,19 @@ EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 3
 
 
-model_name = 'baseline' if baseline else 'advanced'
+model_name = 'baseline' if baseline else 'advanced_dropout'
 MODEL_NAME = f"{LABEL_KEY}-{model_name}-{EPOCHS}-{TRAIN_BATCH_SIZE}"
 
 
 LEARNING_RATE = 0.001
 
-HIDDEN_UNITS_DEEP_TANH = [64,32,16]
-HIDDEN_UNITS_DEEP_RELU = [16,8,4]
-HIDDEN_UNITS_WIDE = [512,64,4]
-HIDDEN_UNITS_MIX = [128,32,2]
-HIDDEN_UNITS_CONCAT = [4,1]
+HIDDEN_UNITS_DEEP_BASE = [64,16,4]
+HIDDEN_UNITS_WIDE_BASE = [512,8]
+HIDDEN_UNITS_MIX_BASE = [128,4]
+HIDDEN_UNITS_CONCAT_BASE = [1]
+
+HIDDEN_UNITS_DEEP_TANH_ADV = [64,32,16]
+HIDDEN_UNITS_DEEP_RELU_ADV = [16,8,4]
+HIDDEN_UNITS_WIDE_ADV = [512,64,4]
+HIDDEN_UNITS_MIX_ADV = [128,32,2]
+HIDDEN_UNITS_CONCAT_ADV = [4,1]

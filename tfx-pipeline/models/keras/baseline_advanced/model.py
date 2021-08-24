@@ -17,7 +17,8 @@ from tensorflow.feature_column import \
     crossed_column, \
     embedding_column, \
     indicator_column
-from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate, Lambda
+from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate, Dropout
+from tensorflow.keras import regularizers
 
 from models.keras.baseline_advanced import constants
 from models.keras.baseline_advanced.features import LABEL_KEY, FEATURE_KEYS, DENSE_FLOAT_FEATURE_KEYS, FEATURE_SPEC, get_schema
@@ -149,12 +150,11 @@ def _wide_and_deep_classifier_baseline(deep, wide, mix):
         mix = Dense(numnodes, activation='relu', name='mix_'+str(mix_idx))(mix)
         
     concat = Concatenate()([deep, wide, mix])
-    for numnodes in constants.HIDDEN_UNITS_CONCAT:
+    for numnodes in constants.HIDDEN_UNITS_CONCAT[:-1]:
         concat_idx += 1
         concat = Dense(numnodes, name='concat_'+str(concat_idx))(concat)
     
-    outputs = tf.squeeze(concat, -1, name='model_output')
-#     outputs = Lambda(lambda x: x, name='model_output')(concat)
+    outputs = Dense(constants.HIDDEN_UNITS_CONCAT[-1], name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
     model.compile(
@@ -168,38 +168,71 @@ def _wide_and_deep_classifier_baseline(deep, wide, mix):
             tf.keras.metrics.RootMeanSquaredError()
         ]
     )
-    model.summary(print_fn=logging.info)
     return model
 
 
-def _wide_and_deep_classifier_advanced(inputs, wide_columns, deep_columns, mixed_columns):
-    deep = DenseFeatures(deep_columns)(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED:
-        deep = Dense(numnodes, activation='relu')(deep)
+def _wide_and_deep_classifier_advanced(deep, wide, mix):
+    deep_idx, wide_idx, mix_idx, concat_idx = 0, 0, 0, 0
+    
+    inputs = {f: Input(name=f, shape=(), dtype=FEATURE_SPEC[f].dtype) for f in FEATURE_KEYS}
 
-    mix = DenseFeatures(mixed_columns)(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED2:
-        mix = Dense(numnodes, activation='relu')(mix)
+    deep = DenseFeatures(deep.values(), name='deep_inputs')(inputs)
+    for numnodes in constants.HIDDEN_UNITS_DEEP_TANH:
+        deep_idx += 1
+        deep = Dense(
+            numnodes, activation='tanh', 
+            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            name='deep_'+str(deep_idx)
+        )(deep)
+        deep = Dropout(0.5, name=f"dropout_deep_{deep_idx}")(deep)
+    for numnodes in constants.HIDDEN_UNITS_DEEP_RELU:
+        deep_idx += 1
+        deep = Dense(
+            numnodes, activation='relu', 
+            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            name='deep_'+str(deep_idx)
+        )(deep)
+        deep = Dropout(0.5, name=f"dropout_deep_{deep_idx}")(deep)
 
-    wide = DenseFeatures(wide_columns)(inputs)
-    for numnodes in constants.HIDDEN_UNITS_ADVANCED_SINK:
-        widesink = Dense(numnodes, activation='relu')(wide)
-
-    output = concatenate([deep, mix, widesink, wide])
-    output = Dense(1, activation='sigmoid')(output)
-    output = tf.squeeze(output, -1)
-
-    model = tf.keras.Model(inputs, output)
+    wide = DenseFeatures(wide.values(), name='wide_inputs')(inputs)
+    for numnodes in constants.HIDDEN_UNITS_WIDE:
+        wide_idx += 1
+        wide = Dense(
+            numnodes, activation='relu', 
+            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            name='wide_'+str(wide_idx)
+        )(wide)
+        wide = Dropout(0.5, name=f"dropout_wide_{wide_idx}")(wide)
+        
+    mix = DenseFeatures(mix.values(), name='mix_inputs')(inputs)
+    for numnodes in constants.HIDDEN_UNITS_MIX:
+        mix_idx += 1
+        mix = Dense(
+            numnodes, activation='relu', 
+            # kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+            name='mix_'+str(mix_idx)
+        )(mix)
+        mix = Dropout(0.5, name=f"dropout_mix_{mix_idx}")(mix)
+        
+    concat = Concatenate()([deep, wide, mix])
+    for numnodes in constants.HIDDEN_UNITS_CONCAT[:-1]:
+        concat_idx += 1
+        concat = Dense(numnodes, name='concat_'+str(concat_idx))(concat)
+    
+    outputs = Dense(constants.HIDDEN_UNITS_CONCAT[-1], name='model_output')(concat)
+    
+    model = tf.keras.Model(inputs, outputs)
     model.compile(
-        loss=tf.keras.losses.Huber(),
+        loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
         optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
         metrics=[
-            tf.keras.metrics.LogCoshError(),
-            tf.keras.metrics.MeanSquaredLogarithmicError(),
-            tf.keras.metrics.MeanAbsolutePercentageError()
+            #'accuracy',
+            # tf.keras.metrics.LogCoshError(),
+            # tf.keras.metrics.MeanSquaredLogarithmicError(),
+            tf.keras.metrics.MeanAbsolutePercentageError(),
+            tf.keras.metrics.RootMeanSquaredError()
         ]
     )
-    model.summary(print_fn=logging.info)
     return model
 
 
@@ -227,6 +260,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         model = _build_keras_model()
+    model.summary(print_fn=logging.info)
 
     earlystopping_callback = tf.keras.callbacks.EarlyStopping(
         monitor='val_mean_absolute_percentage_error', 
@@ -237,7 +271,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # Write logs to path
     tb_logdir = os.path.join(
         fn_args.model_run_dir[:fn_args.model_run_dir.rfind('/')], 
-        f"{constants.MODEL_NAME} ({fn_args.model_run_dir[fn_args.model_run_dir.rfind('/')+1:]})"
+        f"{constants.MODEL_NAME}-({fn_args.model_run_dir[fn_args.model_run_dir.rfind('/')+1:]})"
     )
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=tb_logdir,

@@ -102,7 +102,8 @@ FEATURE_SPEC = {
         feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.string)
         for feature in CATEGORICAL_FEATURE_KEYS
     },
-    LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
+    LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32),
+#     LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64),
 }
 FEATURE_SPEC['year'] = tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)
 

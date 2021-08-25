@@ -3,8 +3,10 @@
 These values can be tweaked to affect model training performance.
 """
 
-baseline = True # False #
-LABEL_KEY = 'log_n_trips' # 'n_trips' #
+baseline = True # False # 
+model_name = 'baseline' if baseline else 'advanced'
+
+LABEL_KEY = 'trips_bucket' # 'log_n_trips' # 'n_trips' #
 
 EPOCHS = 25
 TRAIN_BATCH_SIZE = 16
@@ -14,7 +16,6 @@ EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 3
 
 
-model_name = 'new_'+('baseline' if baseline else 'advanced')
 MODEL_NAME = f"{LABEL_KEY}-{model_name}-{EPOCHS}-{TRAIN_BATCH_SIZE}"
 
 

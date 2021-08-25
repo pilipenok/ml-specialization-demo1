@@ -95,11 +95,6 @@ def _build_keras_model() -> tf.keras.Model:
 #         hour_bucket = categorical_column_with_hash_bucket('hour', 4, dtype=tf.int64),
         is_holiday_day_of_week = crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
     )
-    # one-hot encode the sparse columns
-    sparse = {
-        colname: indicator_column(col)
-        for colname, col in sparse.items()
-    }
     
     embed = dict(
         area_emb = embedding_column(sparse['area'], 4),
@@ -109,6 +104,12 @@ def _build_keras_model() -> tf.keras.Model:
         week_emb = embedding_column(sparse['week'], 4),
         day_of_week_emb = embedding_column(sparse['day_of_week'], 2),
     )
+    
+    # one-hot encode the sparse columns
+    sparse = {
+        colname: indicator_column(col)
+        for colname, col in sparse.items()
+    }
     
     if constants.baseline:
         return _wide_and_deep_classifier_baseline(
@@ -145,17 +146,6 @@ def _wide_and_deep_classifier_baseline(deep, wide):
     outputs = Dense(constants.HIDDEN_UNITS_BASE_CONCAT[-1], name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
-    model.compile(
-        loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
-        optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
-        metrics=[
-            #'accuracy',
-            # tf.keras.metrics.LogCoshError(),
-            # tf.keras.metrics.MeanSquaredLogarithmicError(),
-            tf.keras.metrics.MeanAbsolutePercentageError(),
-            tf.keras.metrics.RootMeanSquaredError()
-        ]
-    )
     return model
 
 
@@ -216,17 +206,6 @@ def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dro
     outputs = Dense(constants.HIDDEN_UNITS_ADV_CONCAT[-1], name='model_output')(concat)
     
     model = tf.keras.Model(inputs, outputs)
-    model.compile(
-        loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
-        optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
-        metrics=[
-            #'accuracy',
-            # tf.keras.metrics.LogCoshError(),
-            # tf.keras.metrics.MeanSquaredLogarithmicError(),
-            tf.keras.metrics.MeanAbsolutePercentageError(),
-            tf.keras.metrics.RootMeanSquaredError()
-        ]
-    )
     return model
 
 
@@ -254,6 +233,17 @@ def run_fn(fn_args: tfx.components.FnArgs):
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         model = _build_keras_model()
+        model.compile(
+            loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
+            optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
+            metrics=[
+                #'accuracy',
+                # tf.keras.metrics.LogCoshError(),
+                # tf.keras.metrics.MeanSquaredLogarithmicError(),
+                tf.keras.metrics.MeanAbsolutePercentageError(),
+                tf.keras.metrics.RootMeanSquaredError()
+            ]
+        )
     model.summary(print_fn=logging.info)
 
     earlystopping_callback = tf.keras.callbacks.EarlyStopping(
@@ -288,13 +278,19 @@ def run_fn(fn_args: tfx.components.FnArgs):
         ]
     )
     
-    logging.info("DNN architecture:\n"
-                 f"\tHIDDEN_UNITS_DEEP_TANH = {constants.HIDDEN_UNITS_DEEP_TANH}\n"
-                 f"\tHIDDEN_UNITS_DEEP_RELU = {constants.HIDDEN_UNITS_DEEP_RELU}\n"
-                 f"\tHIDDEN_UNITS_WIDE = {constants.HIDDEN_UNITS_WIDE}\n"
-                 f"\tHIDDEN_UNITS_MIX = {constants.HIDDEN_UNITS_MIX}\n"
-                 f"\tHIDDEN_UNITS_CONCAT = {constants.HIDDEN_UNITS_CONCAT}"
-    )
+    if constants.baseline:
+        logging.info("Baseline DNN architecture:\n"
+                     f"\tHIDDEN_UNITS_BASE_DEEP = {constants.HIDDEN_UNITS_BASE_DEEP}\n"
+                     f"\tHIDDEN_UNITS_BASE_CONCAT = {constants.HIDDEN_UNITS_BASE_CONCAT}"
+        )
+    else:
+        logging.info("Advanced DNN architecture:\n"
+                     f"\tHIDDEN_UNITS_ADV_DEEP = {constants.HIDDEN_UNITS_ADV_DEEP}\n"
+                     f"\tHIDDEN_UNITS_ADV_EMBED = {constants.HIDDEN_UNITS_ADV_EMBED}\n"
+                     f"\tHIDDEN_UNITS_ADV_MIX = {constants.HIDDEN_UNITS_ADV_MIX}\n"
+                     f"\tHIDDEN_UNITS_ADV_WIDE = {constants.HIDDEN_UNITS_ADV_WIDE}\n"
+                     f"\tHIDDEN_UNITS_ADV_CONCAT = {constants.HIDDEN_UNITS_ADV_CONCAT}"
+        )
     logging.info(f"TensorBoard log directory: {tb_logdir}")
 
     # signatures = {

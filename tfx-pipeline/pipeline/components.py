@@ -1,6 +1,6 @@
 import tfx
 from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Trainer, Evaluator, Pusher
-from tfx.proto import trainer_pb2
+from tfx.proto import trainer_pb2, pusher_pb2
 from tfx.dsl.components.base import executor_spec
 from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
@@ -71,7 +71,8 @@ def transform(
     return Transform(
         examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
-        preprocessing_fn=configs.PREPROCESSING_FN
+        #preprocessing_fn=configs.PREPROCESSING_FN,
+        module_file=configs.MODULE_FILE,
     )
 
 
@@ -98,19 +99,22 @@ def trainer(
 def trainer_vertex(
         example_gen=example_gen(),
         schema_gen=schema_gen(),
-        # transform=transform(),
+        transform=transform(),
 ):
     # See https://www.tensorflow.org/tfx/tutorials/tfx/gcp/vertex_pipelines_vertex_training
     # for tutorial example
 
     # Trains a model using Vertex AI Training.
     # NEW: We need to specify a Trainer for GCP with related configs.
-    return GCP_AI_Trainer(
+    return tfx.components.Trainer(
         module_file=configs.MODULE_FILE,
         #run_fn=configs.RUN_FN,
 
-        examples=example_gen.outputs['examples'],
         schema=schema_gen.outputs['schema'],
+#        examples=example_gen.outputs['examples'],
+        examples=transform.outputs['transformed_examples'],
+        transform_graph=transform.outputs['transform_graph'],
+        
         train_args=tfx.proto.trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=tfx.proto.trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         custom_config={
@@ -178,4 +182,19 @@ def pusher(
         # push_destination=pusher_pb2.PushDestination(filesystem=pusher_pb2.PushDestination.Filesystem(base_directory=configs.SERVING_MODEL_DIR)),
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
         custom_config={ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS}
+    )
+
+
+@lru_cache(maxsize=None)
+def pusher_vertex(
+    trainer=trainer(),
+    evaluator=evaluator()
+):
+    return tfx.components.Pusher(
+        model=trainer.outputs['model'],
+        model_blessing=evaluator.outputs['blessing'],
+     
+        push_destination=pusher_pb2.PushDestination(
+          filesystem=pusher_pb2.PushDestination.Filesystem(
+              base_directory=configs.SERVING_MODEL_DIR))
     )

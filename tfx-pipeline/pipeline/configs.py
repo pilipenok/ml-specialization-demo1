@@ -36,7 +36,8 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
-MODULE_FILE = os.join(os.path.dirname(__file__), '../keras/baseline_advanced/model.py')
+MODULE_FILE = 'gs://chicago-taxi-ml-demo-1/model.py'
+SERVING_MODEL_DIR = 'gs://chicago-taxi-ml-demo-1/serving_model'
 
 TRAIN_NUM_STEPS = 100000
 EVAL_NUM_STEPS = 1000
@@ -96,9 +97,9 @@ GCP_VERTEX_AI_TRAINING_ARGS = {
     # https://cloud.google.com/ml-engine/docs/containers-overview
     # You can specify a custom container here. If not specified, TFX will use
     # a public container image matching the installed version of TFX.
-    'masterConfig': {
-      'imageUri': PIPELINE_IMAGE
-    },
+    #'masterConfig': {
+    #  'imageUri': PIPELINE_IMAGE
+    #},
     # Note that if you do specify a custom container, ensure the entrypoint
     # calls into TFX's run_executor script (tfx/scripts/run_executor.py)
 

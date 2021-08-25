@@ -5,16 +5,15 @@ from typing import List
 from absl import logging
 
 import tensorflow as tf
-from tensorflow_metadata.proto.v0 import schema_pb2
 from tfx import v1 as tfx
+import tensorflow_transform as tft
+
+from tensorflow_metadata.proto.v0 import schema_pb2
 from tfx_bsl.public import tfxio
 from tensorflow import feature_column as tfc
 from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate
 
 from tensorflow_transform.tf_metadata import schema_utils
-
-from models.keras.baseline_advanced.features import get_schema
-from pipeline import configs
 
 HIDDEN_UNITS_DEEP_TANH = [64, 32, 16]
 HIDDEN_UNITS_DEEP_RELU = [16, 8, 4]
@@ -94,6 +93,20 @@ def get_schema():
     return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
     # return components.schema_gen().outputs['schema']
 
+
+def preprocessing_fn(inputs):
+    """tf.transform's callback function for preprocessing inputs.
+
+    Args:
+        inputs: map from feature keys to raw not-yet-transformed features.
+
+    Returns:
+        Map from string feature key to transformed feature operations.
+    """
+    
+    outputs = inputs
+
+    return outputs    
 
 def _get_serve_tf_examples_fn(model, tf_transform_output):
     """Returns a function that parses a serialized tf.Example and applies TFT."""
@@ -260,8 +273,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     schema = get_schema()
 
-    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, configs.TRAIN_BATCH_SIZE)
-    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, configs.EVAL_BATCH_SIZE)
+    train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, TRAIN_BATCH_SIZE)
+    eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, EVAL_BATCH_SIZE)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():

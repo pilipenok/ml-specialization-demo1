@@ -8,10 +8,12 @@
 
 package com.epam.gcp.chicagotaximl.dataflow;
 
+import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.AverageFn.Accum;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,9 +31,10 @@ import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
+import org.apache.beam.sdk.transforms.Combine;
+import org.apache.beam.sdk.transforms.Combine.CombineFn;
 import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.MapElements;
-import org.apache.beam.sdk.transforms.Mean;
 import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.transforms.Wait;
@@ -103,16 +106,9 @@ public class TripsPublicBqToStorage {
             WithKeys.of(TripsPublicBqToStorage::makeAreaHourGroupingKey)
                     .withKeyType(TypeDescriptors.strings()));
 
-    PCollection<KV<String, Double>> averageFares = tripsByKey
-            .apply("Grouping fares",
-                    MapElements.via(
-                      new SimpleFunction<KV<String, Trip>, KV<String, Float>>() {
-                        @Override
-                        public KV<String, Float> apply(KV<String, Trip> r) {
-                          return KV.of(r.getKey(), r.getValue().getFare());
-                        }
-                      }))
-            .apply("Calculating average fare", Mean.perKey());
+    PCollection<KV<String, Double>> averageFares =
+        tripsByKey
+            .apply("Calculating average fare", Combine.perKey(new AverageFn()));
 
     PCollection<KV<String, Long>> counts = tripsByKey.apply("Calculating number of trips",
             Count.perKey());
@@ -141,6 +137,42 @@ public class TripsPublicBqToStorage {
               .withoutSharding());
 
     p.run();
+  }
+
+  /**
+   * Average function.
+   */
+  public static class AverageFn extends CombineFn<Trip, Accum, Double>  {
+
+    public static class Accum implements Serializable {
+      double sum = 0;
+      int count = 0;
+    }
+
+    @Override
+    public Accum createAccumulator() { return new Accum(); }
+
+    @Override
+    public Accum addInput(Accum accum, Trip input) {
+      accum.sum += input.getFare();
+      accum.count++;
+      return accum;
+    }
+
+    @Override
+    public Accum mergeAccumulators(Iterable<Accum> accums) {
+      Accum merged = createAccumulator();
+      for (Accum accum : accums) {
+        merged.sum += accum.sum;
+        merged.count += accum.count;
+      }
+      return merged;
+    }
+
+    @Override
+    public Double extractOutput(Accum accum) {
+      return ((double) accum.sum) / accum.count;
+    }
   }
 
   @VisibleForTesting
@@ -240,6 +272,13 @@ public class TripsPublicBqToStorage {
     void setDataset(ValueProvider<String> dataset);
 
 
+    @Description("BigQuery source table.")
+    @Default.String("processed_trips")
+    ValueProvider<String> getSourceTable();
+
+    void setSourceTable(ValueProvider<String> sourceTable);
+
+
     @Description("A date from which the trips should be fetched from the source table.")
     @Default.String("2018-08-01")
     ValueProvider<String> getFromDate();
@@ -263,7 +302,7 @@ public class TripsPublicBqToStorage {
             + " t.pickup_community_area, "
             + " IF (h.countryRegionCode IS NULL, false, true) AS is_us_holiday, "
             + " t.fare "
-            + " FROM `%1$s.taxi_trips_view` t "
+            + " FROM `%1$s.%4$s` t "
             + " LEFT JOIN `%1$s.national_holidays` h "
             + "     ON TIMESTAMP_TRUNC(t.trip_start_timestamp, DAY) = TIMESTAMP_TRUNC(h.date, DAY) "
             + "     AND h.countryRegionCode = 'US' "
@@ -281,6 +320,7 @@ public class TripsPublicBqToStorage {
             + " LIMIT %3$d",
     StringEscapeUtils.escapeSql(options.getDataset().get()),
     options.getFromDate().get(),
-    options.getLimit().get());
+    options.getLimit().get(),
+    StringEscapeUtils.escapeSql(options.getSourceTable().get()));
   }
 }

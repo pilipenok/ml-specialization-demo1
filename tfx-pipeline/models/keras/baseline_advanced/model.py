@@ -121,8 +121,8 @@ def _build_keras_model() -> tf.keras.Model:
             deep=real_valued_columns,
             embed=embed,
             wide=sparse,
-            regularizer=False,
-            dropout=False
+            regularizer=constants.regularizer,
+            dropout=constants.dropout
         )
 
 
@@ -141,7 +141,7 @@ def _wide_and_deep_classifier_baseline(deep, wide):
     concat = Concatenate()([deep, wide])
     for numnodes in constants.HIDDEN_UNITS_BASE_CONCAT[:-1]:
         concat_idx += 1
-        concat = Dense(numnodes, activation='sigm', name='concat_'+str(concat_idx))(concat)
+        concat = Dense(numnodes, activation='sigmoid', name='concat_'+str(concat_idx))(concat)
     
     outputs = Dense(constants.HIDDEN_UNITS_BASE_CONCAT[-1], name='model_output')(concat)
     
@@ -234,20 +234,19 @@ def run_fn(fn_args: tfx.components.FnArgs):
     with mirrored_strategy.scope():
         model = _build_keras_model()
         model.compile(
-            loss=tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.MeanSquaredError(), # tf.keras.losses.Huber(), # 
+            loss=tf.keras.losses.MeanSquaredError() if constants.baseline else tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.Huber(), # 
             optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
             metrics=[
-                #'accuracy',
-                # tf.keras.metrics.LogCoshError(),
-                # tf.keras.metrics.MeanSquaredLogarithmicError(),
                 tf.keras.metrics.MeanAbsolutePercentageError(),
-                tf.keras.metrics.RootMeanSquaredError()
+                tf.keras.metrics.RootMeanSquaredError(),
+                # tf.keras.metrics.MeanSquaredLogarithmicError(),
+                # tf.keras.metrics.LogCoshError(),
             ]
         )
     model.summary(print_fn=logging.info)
 
     earlystopping_callback = tf.keras.callbacks.EarlyStopping(
-        monitor='val_mean_absolute_percentage_error', 
+        monitor='val_mean_squared_error' if constants.baseline else 'val_mean_absolute_percentage_error', 
         patience=constants.ES_PATIENCE,
         restore_best_weights=True, 
         verbose=1
@@ -284,7 +283,9 @@ def run_fn(fn_args: tfx.components.FnArgs):
                      f"\tHIDDEN_UNITS_BASE_CONCAT = {constants.HIDDEN_UNITS_BASE_CONCAT}"
         )
     else:
-        logging.info("Advanced DNN architecture:\n"
+        logging.info(f"Advanced DNN architecture ("
+                     f"{'with' if constants.regularizer else 'without'} regularization, "
+                     f"{'with' if constants.dropout else 'without'} dropout):\n"
                      f"\tHIDDEN_UNITS_ADV_DEEP = {constants.HIDDEN_UNITS_ADV_DEEP}\n"
                      f"\tHIDDEN_UNITS_ADV_EMBED = {constants.HIDDEN_UNITS_ADV_EMBED}\n"
                      f"\tHIDDEN_UNITS_ADV_MIX = {constants.HIDDEN_UNITS_ADV_MIX}\n"

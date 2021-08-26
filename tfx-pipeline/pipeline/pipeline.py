@@ -37,39 +37,39 @@ def create_pipeline(
     """Implements the chicago taxi pipeline with TFX."""
 
     _example_gen = example_gen()
-    
+
     _statistics_gen = statistics_gen(
         example_gen=_example_gen
     )
-    
+
     _schema_gen = schema_gen(
         statistics_gen=_statistics_gen
     )
-    
+
     _transform = transform(
         example_gen=_example_gen,
         schema_gen=_schema_gen
     )
-    
+
     _example_validator = example_validator(
         statistics_gen=_statistics_gen, 
         schema_gen=_schema_gen
     )
-    
+
     _trainer = trainer(
         example_gen=_example_gen, 
         schema_gen=_schema_gen,
         transform=_transform
     )
-    
+
     _model_resolver = model_resolver()
-    
+
     _evaluator = evaluator(
         example_gen=_example_gen,
         trainer=_trainer,
         model_resolver=_model_resolver
     )
-    
+
     _pusher = pusher(
         trainer=_trainer,
         evaluator=_evaluator
@@ -92,6 +92,6 @@ def create_pipeline(
         pipeline_root=pipeline_root,
         components=components,
         # Change this value to control caching of execution results. Default value
-        enable_cache=True,
+        enable_cache=False,
         metadata_connection_config=metadata_connection_config,
     )

@@ -26,8 +26,8 @@ GCS_BUCKET_NAME = 'chicago-taxi-ml-demo-1'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
-DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/test/'
-#DATA_PATH = 'data/'
+DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/small/'
+LOCAL_DATA_PATH = '/Users/andrey_gritsenko/Downloads/trips/' # local path to 'trips_small.csv'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -79,14 +79,17 @@ GCP_AI_PLATFORM_SERVING_ARGS = {
 # TFX pipeline produces many output files and metadata. All output data will be
 # stored under this OUTPUT_DIR.
 OUTPUT_DIR = f'gs://{GCS_BUCKET_NAME}'
+LOCAL_OUTPUT_DIR = '/Users/andrey_gritsenko/PycharmProjects/ml-specialization-demo1/'
 
 # TFX produces two types of outputs, files and metadata.
 # - Files will be created under PIPELINE_ROOT directory.
 PIPELINE_ROOT = f'{OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
+LOCAL_PIPELINE_ROOT = f'{LOCAL_OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
 
 # The last component of the pipeline, "Pusher" will produce serving model under
 # SERVING_MODEL_DIR.
 SERVING_MODEL_DIR = f'{PIPELINE_ROOT}/serving_model'
+LOCAL_SERVING_MODEL_DIR = f'{LOCAL_PIPELINE_ROOT}/serving_model'
 
 # NEW: Configuration for Vertex AI Training.
 # This dictionary will be passed as `CustomJobSpec`.

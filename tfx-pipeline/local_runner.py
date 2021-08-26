@@ -21,17 +21,20 @@ from __future__ import print_function
 import os
 from absl import logging
 
-from pipeline import configs
-from pipeline import pipeline
 from tfx.orchestration import metadata
 from tfx.orchestration.local.local_dag_runner import LocalDagRunner
-from tfx.proto import trainer_pb2
 
 from pipeline import configs
 from pipeline import pipeline
 
 
-METADATA_PATH = 'taxi_metadata.db'
+METADATA_PATH = os.path.join(
+    configs.LOCAL_OUTPUT_DIR,
+    'tfx_metadata',
+    configs.PIPELINE_NAME,
+    'metadata.db'
+)
+
 
 def run():
     """Define a local pipeline."""
@@ -39,7 +42,7 @@ def run():
     LocalDagRunner().run(
         pipeline.create_pipeline(
             pipeline_name=configs.PIPELINE_NAME,
-            pipeline_root=configs.PIPELINE_ROOT,
+            pipeline_root=configs.LOCAL_PIPELINE_ROOT,
             metadata_connection_config=metadata.sqlite_metadata_connection_config(METADATA_PATH)
         )
     )

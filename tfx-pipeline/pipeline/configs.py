@@ -39,8 +39,8 @@ RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 MODULE_FILE = 'gs://chicago-taxi-ml-demo-1/model.py'
 SERVING_MODEL_DIR = 'gs://chicago-taxi-ml-demo-1/serving_model'
 
-TRAIN_NUM_STEPS = 100000
-EVAL_NUM_STEPS = 1000
+TRAIN_NUM_STEPS = 10#0000
+EVAL_NUM_STEPS = 10#00
 EVAL_ACCURACY_THRESHOLD = 0.6
 TRAIN_BATCH_SIZE = 64
 EVAL_BATCH_SIZE = 64

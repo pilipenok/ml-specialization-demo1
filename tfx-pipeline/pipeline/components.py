@@ -193,8 +193,9 @@ def pusher_vertex(
     return tfx.components.Pusher(
         model=trainer.outputs['model'],
         model_blessing=evaluator.outputs['blessing'],
+        custom_config={ENABLE_VERTEX_KEY: True}
      
-        push_destination=pusher_pb2.PushDestination(
-          filesystem=pusher_pb2.PushDestination.Filesystem(
-              base_directory=configs.SERVING_MODEL_DIR))
+        # push_destination=pusher_pb2.PushDestination(
+        #   filesystem=pusher_pb2.PushDestination.Filesystem(
+        #       base_directory=configs.SERVING_MODEL_DIR)),
     )

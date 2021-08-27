@@ -3,11 +3,14 @@
 These values can be tweaked to affect model training performance.
 """
 
-baseline = False # True # 
-model_name = 'baseline' if baseline else 'advanced'
 
-LABEL_KEY = 'trips_bucket_num' # 'log_n_trips' # 'n_trips' #
+task = 'class' # 'reg' #
+baseline = True # False #
 
+regularizer = False # True #
+dropout = False # True #
+
+NUM_CLASSES = 6
 EPOCHS = 25
 TRAIN_BATCH_SIZE = 16
 TRAIN_NUM_STEPS = 50000
@@ -15,12 +18,12 @@ EVAL_BATCH_SIZE = 16
 EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 0 if baseline else 3
 
-regularizer = False # True # 
-dropout = False # True # 
 
+LABEL_KEY = 'trips_bucket' if task == 'class' else 'trips_bucket_num' # 'log_n_trips' # 'n_trips' #
 
-MODEL_NAME = f"{LABEL_KEY}-{model_name}"\
-             f"{'_reg' if regularizer and not baseline else ''}"\
+MODEL_NAME = f"{LABEL_KEY}-"\
+             f"{'baseline' if baseline else 'advanced'}"\
+             f"{'_regul' if regularizer and not baseline else ''}"\
              f"{'_drop' if dropout and not baseline else ''}"\
              f"-{EPOCHS}-{TRAIN_BATCH_SIZE}"
 
@@ -28,10 +31,10 @@ MODEL_NAME = f"{LABEL_KEY}-{model_name}"\
 LEARNING_RATE = 0.001
 
 HIDDEN_UNITS_BASE_DEEP = [32,16,8]
-HIDDEN_UNITS_BASE_CONCAT = [32,1]
+HIDDEN_UNITS_BASE_CONCAT = [32,1 if task=='reg' else NUM_CLASSES]
 
 HIDDEN_UNITS_ADV_DEEP = [64,32,16]
 HIDDEN_UNITS_ADV_EMBED = [8]
 HIDDEN_UNITS_ADV_MIX = [16,4]
 HIDDEN_UNITS_ADV_WIDE = [512,64,4]
-HIDDEN_UNITS_ADV_CONCAT = [4,1]
+HIDDEN_UNITS_ADV_CONCAT = [4,1 if task=='reg' else NUM_CLASSES]

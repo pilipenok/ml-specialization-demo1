@@ -18,7 +18,11 @@ from tensorflow.feature_column import \
     embedding_column, \
     indicator_column
 from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate, Dropout
-from tensorflow.keras import regularizers
+from tensorflow.keras.losses import SparseCategoricalCrossentropy, MeanSquaredError, MeanAbsolutePercentageError
+from tensorflow.keras.metrics import \
+    Accuracy, AUC, SparseCategoricalAccuracy, SparseCategoricalCrossentropy, \
+    MeanSquaredError, MeanAbsolutePercentageError
+from tensorflow.keras.regularizers import l1_l2
 
 from models.keras.baseline_advanced import constants
 from models.keras.baseline_advanced.features import LABEL_KEY, FEATURE_KEYS, DENSE_FLOAT_FEATURE_KEYS, FEATURE_SPEC, get_schema
@@ -159,7 +163,7 @@ def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dro
         deep_idx += 1
         deep = Dense(
             numnodes, activation='tanh', 
-            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            kernel_regularizer=l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='deep_'+str(deep_idx)
         )(deep)
         if dropout:
@@ -170,7 +174,7 @@ def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dro
         embed_idx += 1
         embed = Dense(
             numnodes, activation='relu', 
-            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            kernel_regularizer=l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='embed_'+str(embed_idx)
         )(embed)
         if dropout:
@@ -181,7 +185,7 @@ def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dro
         mix_idx += 1
         mix = Dense(
             numnodes, activation='tanh', 
-            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            kernel_regularizer=l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='mix_'+str(mix_idx)
         )(mix)
         if dropout:
@@ -192,7 +196,7 @@ def _wide_and_deep_classifier_advanced(deep, embed, wide, regularizer=False, dro
         wide_idx += 1
         wide = Dense(
             numnodes, activation='relu', 
-            kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01) if regularizer else None,
+            kernel_regularizer=l1_l2(l1=0.01, l2=0.01) if regularizer else None,
             name='wide_'+str(wide_idx)
         )(wide)
         if dropout:
@@ -230,18 +234,32 @@ def run_fn(fn_args: tfx.components.FnArgs):
     train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, constants.TRAIN_BATCH_SIZE)
     eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, constants.EVAL_BATCH_SIZE)
     
+    if constants.task == 'class':
+        loss = SparseCategoricalCrossentropy(from_logits=True)
+        metrics = [
+            Accuracy(),
+            AUC(curve='ROC', name='ROC'),
+            AUC(curve='PR', name='PR'),
+            SparseCategoricalAccuracy(),
+            SparseCategoricalCrossentropy(from_logits=True)
+        ]
+    elif constants.task == 'reg':
+        loss = MeanSquaredError() if constants.baseline else MeanAbsolutePercentageError() # tf.keras.losses.Huber() #
+        metrics = [
+            MeanSquaredError(),
+            MeanAbsolutePercentageError(),
+            # tf.keras.metrics.RootMeanSquaredError(),
+            # tf.keras.metrics.MeanSquaredLogarithmicError(),
+            # tf.keras.metrics.LogCoshError(),
+        ]
+    
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         model = _build_keras_model()
         model.compile(
-            loss=tf.keras.losses.MeanSquaredError() if constants.baseline else tf.keras.losses.MeanAbsolutePercentageError(), # tf.keras.losses.Huber(), # 
+            loss=loss,
             optimizer=tf.keras.optimizers.Adam(lr=constants.LEARNING_RATE),
-            metrics=[
-                tf.keras.metrics.MeanAbsolutePercentageError(),
-                tf.keras.metrics.RootMeanSquaredError(),
-                # tf.keras.metrics.MeanSquaredLogarithmicError(),
-                # tf.keras.metrics.LogCoshError(),
-            ]
+            metrics=metrics
         )
     model.summary(print_fn=logging.info)
 

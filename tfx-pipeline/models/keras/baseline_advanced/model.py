@@ -234,27 +234,27 @@ def run_fn(fn_args: tfx.components.FnArgs):
     train_dataset = _input_fn(fn_args.train_files, fn_args.data_accessor, schema, constants.TRAIN_BATCH_SIZE)
     eval_dataset = _input_fn(fn_args.eval_files, fn_args.data_accessor, schema, constants.EVAL_BATCH_SIZE)
     
-    if constants.task == 'class':
-        loss = SparseCategoricalCrossentropy(from_logits=True)
-        metrics = [
-            Accuracy(),
-            AUC(curve='ROC', name='ROC'),
-            AUC(curve='PR', name='PR'),
-            SparseCategoricalAccuracy(),
-            SparseCategoricalCrossentropy(from_logits=True)
-        ]
-    elif constants.task == 'reg':
-        loss = MeanSquaredError() if constants.baseline else MeanAbsolutePercentageError() # tf.keras.losses.Huber() #
-        metrics = [
-            MeanSquaredError(),
-            MeanAbsolutePercentageError(),
-            # tf.keras.metrics.RootMeanSquaredError(),
-            # tf.keras.metrics.MeanSquaredLogarithmicError(),
-            # tf.keras.metrics.LogCoshError(),
-        ]
-    
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
+        if constants.task == 'class':
+            loss = SparseCategoricalCrossentropy(from_logits=True)
+            metrics = [
+                Accuracy(),
+                AUC(curve='ROC', name='ROC'),
+                AUC(curve='PR', name='PR'),
+                SparseCategoricalAccuracy(),
+                SparseCategoricalCrossentropy(from_logits=True)
+            ]
+        elif constants.task == 'reg':
+            loss = MeanSquaredError() if constants.baseline else MeanAbsolutePercentageError() # tf.keras.losses.Huber() #
+            metrics = [
+                MeanSquaredError(),
+                MeanAbsolutePercentageError(),
+                # tf.keras.metrics.RootMeanSquaredError(),
+                # tf.keras.metrics.MeanSquaredLogarithmicError(),
+                # tf.keras.metrics.LogCoshError(),
+            ]
+        
         model = _build_keras_model()
         model.compile(
             loss=loss,

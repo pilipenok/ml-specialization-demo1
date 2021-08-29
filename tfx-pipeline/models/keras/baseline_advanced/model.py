@@ -18,7 +18,9 @@ from tensorflow.feature_column import \
     embedding_column, \
     indicator_column
 from tensorflow.keras.layers import Input, DenseFeatures, Dense, Concatenate, Dropout
-from tensorflow.keras.losses import SparseCategoricalCrossentropy, MeanSquaredError, MeanAbsolutePercentageError
+from tensorflow.keras.losses import \
+    SparseCategoricalCrossentropy as loss_sce, \
+    MeanSquaredError as loss_mse, MeanAbsolutePercentageError as loss_mape
 from tensorflow.keras.metrics import \
     Accuracy, AUC, SparseCategoricalAccuracy, SparseCategoricalCrossentropy, \
     MeanSquaredError, MeanAbsolutePercentageError
@@ -237,7 +239,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
         if constants.task == 'class':
-            loss = SparseCategoricalCrossentropy(from_logits=True)
+            loss = loss_sce(from_logits=True)
             metrics = [
                 Accuracy(),
                 AUC(curve='ROC', name='ROC'),
@@ -246,7 +248,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
                 SparseCategoricalCrossentropy(from_logits=True)
             ]
         elif constants.task == 'reg':
-            loss = MeanSquaredError() if constants.baseline else MeanAbsolutePercentageError() # tf.keras.losses.Huber() #
+            loss = loss_mse() if constants.baseline else loss_mape() # tf.keras.losses.Huber() #
             metrics = [
                 MeanSquaredError(),
                 MeanAbsolutePercentageError(),

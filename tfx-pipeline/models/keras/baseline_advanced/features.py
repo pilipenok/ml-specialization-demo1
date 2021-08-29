@@ -19,6 +19,7 @@ from pipeline import components
 
 # Keys
 from models.keras.baseline_advanced.constants import LABEL_KEY
+from models.keras.baseline_advanced.constants import NUM_CLASSES
 # LABEL_KEY = 'n_trips' # 'log_n_trips' # 
 
 FEATURE_KEYS = \
@@ -102,7 +103,10 @@ FEATURE_SPEC = {
         feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.string)
         for feature in CATEGORICAL_FEATURE_KEYS
     },
-    LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32 if '_num' in LABEL_KEY else tf.int64),
+    LABEL_KEY: tf.io.FixedLenFeature(
+        shape=[1 if '_num' in LABEL_KEY else NUM_CLASSES], 
+        dtype=tf.float32 if '_num' in LABEL_KEY else tf.int64
+    ),
 #     LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64),
 }
 FEATURE_SPEC['year'] = tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)

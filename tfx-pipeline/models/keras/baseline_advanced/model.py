@@ -247,7 +247,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
                 SparseCategoricalAccuracy(),
                 SparseCategoricalCrossentropy(from_logits=True)
             ]
-        elif constants.task == 'reg':
+        elif constants.task == 'regr':
             loss = loss_mse() if constants.baseline else loss_mape() # tf.keras.losses.Huber() #
             metrics = [
                 MeanSquaredError(),

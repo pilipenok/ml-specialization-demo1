@@ -71,8 +71,8 @@ def create_pipeline(
     )
 
     _pusher = pusher(
-        trainer=_trainer,
-        evaluator=_evaluator
+        model=_trainer.outputs['model'],
+        model_blessing=_evaluator.outputs['blessing']
     )
 
     components = [

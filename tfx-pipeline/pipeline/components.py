@@ -12,6 +12,7 @@ from tfx.extensions.google_cloud_ai_platform.trainer.component import Trainer as
 from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 from tfx.extensions.google_cloud_ai_platform.trainer.executor import ENABLE_VERTEX_KEY, VERTEX_REGION_KEY, TRAINING_ARGS_KEY
+from tfx.extensions.google_cloud_ai_platform.pusher.executor import VERTEX_CONTAINER_IMAGE_URI_KEY
 
 from pipeline import configs
 from models.keras.baseline_advanced import features
@@ -172,28 +173,37 @@ def evaluator(
 
 @lru_cache(maxsize=None)
 def pusher(
-        trainer=trainer()
+    model=trainer().outputs['model'],
+    model_blessing=None,
 ):
-    return Pusher(
-        model=trainer.outputs['model'],
-        # model_blessing=evaluator.outputs['blessing'],
-        # push_destination=pusher_pb2.PushDestination(filesystem=pusher_pb2.PushDestination.Filesystem(base_directory=configs.SERVING_MODEL_DIR)),
-        custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
-        custom_config={ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS}
+    pusher_args = dict(
+        model=model,
+        custom_config={
+            ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS
+        }
     )
+    if model_blessing is not None:
+        pusher_args.update(model_blessing=model_blessing)
+
+    return tfx.components.Pusher(**pusher_args).with_id("Pusher")
 
 
 @lru_cache(maxsize=None)
 def pusher_vertex(
-    trainer=trainer(),
-    evaluator=evaluator()
+    model=trainer().outputs['model'],
+    model_blessing=None,
 ):
-    return tfx.components.Pusher(
-        model=trainer.outputs['model'],
-        model_blessing=evaluator.outputs['blessing'],
-        custom_config={ENABLE_VERTEX_KEY: True}
-     
-        # push_destination=pusher_pb2.PushDestination(
-        #   filesystem=pusher_pb2.PushDestination.Filesystem(
-        #       base_directory=configs.SERVING_MODEL_DIR)),
+    pusher_args = dict(
+        model=model,
+        custom_config={
+            ENABLE_VERTEX_KEY: True,
+            VERTEX_REGION_KEY: configs.GOOGLE_CLOUD_REGION,
+            VERTEX_CONTAINER_IMAGE_URI_KEY: 'us-docker.pkg.dev/vertex-ai/prediction/tf2-cpu.2-5:latest',
+            # See here https://cloud.google.com/vertex-ai/docs/predictions/pre-built-containers
+            ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS
+        }
     )
+    if model_blessing is not None:
+        pusher_args.update(model_blessing=model_blessing)
+
+    return tfx.components.Pusher(**pusher_args).with_id("PusherVertexAI")

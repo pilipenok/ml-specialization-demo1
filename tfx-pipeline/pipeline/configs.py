@@ -74,7 +74,18 @@ GCP_AI_PLATFORM_SERVING_ARGS = {
     # Note that serving currently only supports a single region:
     # https://cloud.google.com/ml-engine/reference/rest/v1/projects.models#Model
     'regions': [GOOGLE_CLOUD_REGION],
+    'endpoint_name': 'chicago_taxi_model_endoint',
+    'min_replica_count': 1,
+    'max_replica_count': 2,
+    'machine_type': 'n1-standard-2'
 }
+# If you are looking for the url to query the Endpoint,
+# that's in a property pushed_destination of the pushed_model output artifact:
+# model_pushed_artifact = pusher.outputs[PUSHED_MODEL_KEY]
+# pushed_destination = model_pushed_artifact.get_string_custom_property("pushed_destination")
+# Together with the VERTEX_REGION_KEY, you can create the url with something like:
+# f"https://{region}-aiplatform.googleapis.com/v1/{pushed_destination}:predict".
+
 
 # TFX pipeline produces many output files and metadata. All output data will be
 # stored under this OUTPUT_DIR.

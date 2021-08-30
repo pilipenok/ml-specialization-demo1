@@ -57,9 +57,10 @@ def create_pipeline(
     )
 
     _trainer = trainer(
-        example_gen=_example_gen, 
-        schema_gen=_schema_gen,
-        transform=_transform
+        #examples=_example_gen.outputs['examples'],
+        schema=_schema_gen.outputs['schema'],
+        transform_examples=transform.outputs['transform_examples'],
+        transform_graph=transform.outputs['transform_graph']
     )
 
     _model_resolver = model_resolver()

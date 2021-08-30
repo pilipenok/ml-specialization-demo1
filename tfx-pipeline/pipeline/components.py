@@ -1,5 +1,5 @@
 import tfx
-from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Trainer, Evaluator, Pusher
+from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Evaluator
 from tfx.proto import trainer_pb2, pusher_pb2
 from tfx.dsl.components.base import executor_spec
 from tfx.dsl.components.common import resolver
@@ -76,44 +76,34 @@ def transform(
 
 
 @lru_cache(maxsize=None)
-def trainer(
-        example_gen=example_gen(),
-        schema_gen=schema_gen(),
-        # transform=transform()
-):
-    return Trainer(
+def trainer(examples=None, schema=None, transform_examples=None, transform_graph=None):
+    args = dict(
         run_fn=configs.RUN_FN,
-        examples=example_gen.outputs['examples'],
-        # transformed_examples=transform.outputs['transformed_examples'],
-        schema=schema_gen.outputs['schema'],
-        # transform_graph=transform.outputs['transform_graph'],
         train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
-        custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_trainer_executor.GenericExecutor),
-        custom_config={ai_platform_trainer_executor.TRAINING_ARGS_KEY: configs.GCP_AI_PLATFORM_TRAINING_ARGS}
+        custom_config={
+            ai_platform_trainer_executor.TRAINING_ARGS_KEY: configs.GCP_AI_PLATFORM_TRAINING_ARGS
+        }
     )
+
+    if examples:
+        args.update(examples=examples)
+    if schema:
+        args.update(schema=schema)
+    if transform_examples:
+        args.update(transform_examples=transform_examples)
+    if transform_graph:
+        args.update(transform_graph=transform_graph)
+
+    return tfx.components.Trainer(**args).with_id('Trainer')
 
 
 @lru_cache(maxsize=None)
-def trainer_vertex(
-        example_gen=example_gen(),
-        schema_gen=schema_gen(),
-        transform=transform(),
-):
+def trainer_vertex(examples=None, schema=None, transform_examples=None, transform_graph=None):
     # See https://www.tensorflow.org/tfx/tutorials/tfx/gcp/vertex_pipelines_vertex_training
     # for tutorial example
-
-    # Trains a model using Vertex AI Training.
-    # NEW: We need to specify a Trainer for GCP with related configs.
-    return tfx.components.Trainer(
+    args = dict(
         module_file=configs.MODULE_FILE,
-        #run_fn=configs.RUN_FN,
-
-        schema=schema_gen.outputs['schema'],
-#        examples=example_gen.outputs['examples'],
-        examples=transform.outputs['transformed_examples'],
-        transform_graph=transform.outputs['transform_graph'],
-        
         train_args=tfx.proto.trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=tfx.proto.trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         custom_config={
@@ -121,7 +111,19 @@ def trainer_vertex(
             VERTEX_REGION_KEY: configs.GOOGLE_CLOUD_REGION,
             TRAINING_ARGS_KEY: configs.GCP_VERTEX_AI_TRAINING_ARGS,
             'use_gpu': configs.USE_GPU
-        })
+        }
+    )
+    if examples:
+        args.update(examples=examples)
+    if schema:
+        args.update(schema=schema)
+    if transform_examples:
+        args.update(transform_examples=transform_examples)
+    if transform_graph:
+        args.update(transform_graph=transform_graph)
+
+    # Trains a model using Vertex AI Training.
+    return tfx.components.Trainer(**args).with_id('TrainerVertex')
 
 
 @lru_cache(maxsize=None)
@@ -172,28 +174,22 @@ def evaluator(
 
 
 @lru_cache(maxsize=None)
-def pusher(
-    model=trainer().outputs['model'],
-    model_blessing=None,
-):
-    pusher_args = dict(
+def pusher(model, model_blessing=None):
+    args = dict(
         model=model,
         custom_config={
             ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS
         }
     )
-    if model_blessing is not None:
-        pusher_args.update(model_blessing=model_blessing)
+    if model_blessing:
+        args.update(model_blessing=model_blessing)
 
-    return tfx.components.Pusher(**pusher_args).with_id("Pusher")
+    return tfx.components.Pusher(**args).with_id("Pusher")
 
 
 @lru_cache(maxsize=None)
-def pusher_vertex(
-    model=trainer().outputs['model'],
-    model_blessing=None,
-):
-    pusher_args = dict(
+def pusher_vertex(model, model_blessing=None,):
+    args = dict(
         model=model,
         custom_config={
             ENABLE_VERTEX_KEY: True,
@@ -203,7 +199,7 @@ def pusher_vertex(
             ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS
         }
     )
-    if model_blessing is not None:
-        pusher_args.update(model_blessing=model_blessing)
+    if model_blessing:
+        args.update(model_blessing=model_blessing)
 
-    return tfx.components.Pusher(**pusher_args).with_id("PusherVertexAI")
+    return tfx.components.Pusher(**args).with_id("PusherVertexAI")

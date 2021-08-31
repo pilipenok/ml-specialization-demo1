@@ -39,21 +39,21 @@ def create_pipeline(
     _example_gen = example_gen()
 
     _statistics_gen = statistics_gen(
-        example_gen=_example_gen
+        examples=_example_gen.outputs['examples']
     )
 
     _schema_gen = schema_gen(
-        statistics_gen=_statistics_gen
+        statistics=_statistics_gen.outputs['statistics'],
     )
 
     _transform = transform(
-        example_gen=_example_gen,
-        schema_gen=_schema_gen
+        examples=_example_gen.outputs['examples'],
+        schema=_schema_gen.outputs['schema'],
     )
 
     _example_validator = example_validator(
-        statistics_gen=_statistics_gen, 
-        schema_gen=_schema_gen
+        statistics=_statistics_gen.outputs['statistics'],
+        schema=_schema_gen.outputs['schema']
     )
 
     _trainer = trainer(
@@ -66,9 +66,9 @@ def create_pipeline(
     _model_resolver = model_resolver()
 
     _evaluator = evaluator(
-        example_gen=_example_gen,
-        trainer=_trainer,
-        model_resolver=_model_resolver
+        examples=_example_gen.outputs['examples'],
+        model=_trainer.outputs['model'],
+        baseline_model=_model_resolver.outputs['model']
     )
 
     _pusher = pusher(

@@ -1,14 +1,12 @@
-import tfx
-from tfx.components import CsvExampleGen, StatisticsGen, SchemaGen, ExampleValidator, Transform, Evaluator
-from tfx.proto import trainer_pb2, pusher_pb2
-from tfx.dsl.components.base import executor_spec
+from tfx import v1 as tfx
+
+from tfx.proto import trainer_pb2
 from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.types import Channel
 from tfx.types.standard_artifacts import Model, ModelBlessing
 import tensorflow_model_analysis as tfma
 
-from tfx.extensions.google_cloud_ai_platform.trainer.component import Trainer as GCP_AI_Trainer
 from tfx.extensions.google_cloud_ai_platform.trainer import executor as ai_platform_trainer_executor
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 from tfx.extensions.google_cloud_ai_platform.trainer.executor import ENABLE_VERTEX_KEY, VERTEX_REGION_KEY, TRAINING_ARGS_KEY
@@ -23,55 +21,37 @@ from functools import lru_cache
 @lru_cache(maxsize=None)
 def example_gen():
     # Brings data into the pipeline or otherwise joins/converts training data.
-    return CsvExampleGen(
+    return tfx.components.CsvExampleGen(
         input_base=configs.DATA_PATH
     )
 
 
 @lru_cache(maxsize=None)
-def statistics_gen(
-        example_gen=example_gen()
-):
+def statistics_gen(examples):
     # Computes statistics over data for visualization and example validation.
-    return StatisticsGen(
-        examples=example_gen.outputs['examples']
-    )
+    return tfx.components.StatisticsGen(examples=examples)
 
 
 @lru_cache(maxsize=None)
-def schema_gen(
-        statistics_gen=statistics_gen()
-):
+def schema_gen(statistics):
     # Generates schema based on statistics files.
-    return SchemaGen(
-        statistics=statistics_gen.outputs['statistics'],
-        infer_feature_shape=True
-    )
+    return tfx.components.SchemaGen(statistics=statistics, infer_feature_shape=True)
 
 
 @lru_cache(maxsize=None)
-def example_validator(
-        statistics_gen=statistics_gen(),
-        schema_gen=schema_gen()
-):
+def example_validator(statistics, schema):
     # Performs anomaly detection based on statistics and data schema.
-    return ExampleValidator(
-        statistics=statistics_gen.outputs['statistics'],
-        schema=schema_gen.outputs['schema']
-    )
+    return tfx.components.ExampleValidator(statistics=statistics, schema=schema)
 
 
 @lru_cache(maxsize=None)
-def transform(
-        example_gen=example_gen(),
-        schema_gen=schema_gen()
-):
+def transform(examples, schema):
     # Performs transformations and feature engineering in training and serving.
-    return Transform(
-        examples=example_gen.outputs['examples'],
-        schema=schema_gen.outputs['schema'],
+    return tfx.components.Transform(
         #preprocessing_fn=configs.PREPROCESSING_FN,
         module_file=configs.MODULE_FILE,
+        examples=examples,
+        schema=schema,
     )
 
 
@@ -137,11 +117,7 @@ def model_resolver():
 
 
 @lru_cache(maxsize=None)
-def evaluator(
-        example_gen=example_gen(),
-        trainer=trainer(),
-        model_resolver=model_resolver()
-):
+def evaluator(examples, model=None, baseline_model=None):
     # Uses TFMA to compute a evaluation statistics over features of a model and
     # perform quality validation of a candidate model (compared to a baseline).
 
@@ -164,13 +140,18 @@ def evaluator(
             ])
         ])
 
-    return Evaluator(
-        examples=example_gen.outputs['examples'],
-        model=trainer.outputs['model'],
-        baseline_model=model_resolver.outputs['model'],
+    args = dict(
+        examples=examples,
         # Change threshold will be ignored if there is no baseline (first run).
         eval_config=eval_config
     )
+
+    if model:
+        args.update(model=model)
+    if baseline_model:
+        args.update(baseline_model=baseline_model)
+
+    return tfx.components.Evaluator(**args).with_id('Evaluator')
 
 
 @lru_cache(maxsize=None)

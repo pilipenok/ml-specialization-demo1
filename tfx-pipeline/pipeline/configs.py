@@ -27,7 +27,7 @@ GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
 DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/small/'
-LOCAL_DATA_PATH = '/Users/andrey_gritsenko/Downloads/trips/' # local path to 'trips_small.csv'
+LOCAL_DATA_PATH = './data' # local path to 'trips_small.csv'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -90,7 +90,7 @@ GCP_AI_PLATFORM_SERVING_ARGS = {
 # TFX pipeline produces many output files and metadata. All output data will be
 # stored under this OUTPUT_DIR.
 OUTPUT_DIR = f'gs://{GCS_BUCKET_NAME}'
-LOCAL_OUTPUT_DIR = '/Users/andrey_gritsenko/PycharmProjects/ml-specialization-demo1/'
+LOCAL_OUTPUT_DIR = './'
 
 # TFX produces two types of outputs, files and metadata.
 # - Files will be created under PIPELINE_ROOT directory.

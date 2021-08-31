@@ -26,51 +26,53 @@ from tfx.orchestration import pipeline
 
 from ml_metadata.proto import metadata_store_pb2
 
-from pipeline.components import example_gen, statistics_gen, schema_gen, example_validator, transform, trainer_vertex as trainer, model_resolver, evaluator, pusher_vertex as pusher
-
+import pipeline.components as pc
 
 def create_pipeline(
     pipeline_name: Text,
     pipeline_root: Text,
     metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
+    enable_vertex=False
 ) -> pipeline.Pipeline:
     """Implements the chicago taxi pipeline with TFX."""
 
-    _example_gen = example_gen()
+    _example_gen = pc.example_gen()
 
-    _statistics_gen = statistics_gen(
+    _statistics_gen = pc.statistics_gen(
         examples=_example_gen.outputs['examples']
     )
 
-    _schema_gen = schema_gen(
+    _schema_gen = pc.schema_gen(
         statistics=_statistics_gen.outputs['statistics'],
     )
 
-    _transform = transform(
+    _transform = pc.transform(
         examples=_example_gen.outputs['examples'],
         schema=_schema_gen.outputs['schema'],
     )
 
-    _example_validator = example_validator(
+    _example_validator = pc.example_validator(
         statistics=_statistics_gen.outputs['statistics'],
         schema=_schema_gen.outputs['schema']
     )
 
+    trainer = pc.trainer_vertex if enable_vertex else pc.trainer
     _trainer = trainer(
-        #examples=_example_gen.outputs['examples'],
         schema=_schema_gen.outputs['schema'],
-        transform_examples=transform.outputs['transform_examples'],
-        transform_graph=transform.outputs['transform_graph']
+        # examples=_example_gen.outputs['examples'],
+        examples=_transform.outputs['transformed_examples'],
+        transform_graph=_transform.outputs['transform_graph']
     )
 
-    _model_resolver = model_resolver()
+    _model_resolver = pc.model_resolver()
 
-    _evaluator = evaluator(
+    _evaluator = pc.evaluator(
         examples=_example_gen.outputs['examples'],
         model=_trainer.outputs['model'],
         baseline_model=_model_resolver.outputs['model']
     )
 
+    pusher = pc.pusher_vertex if enable_vertex else pc.pusher
     _pusher = pusher(
         model=_trainer.outputs['model'],
         model_blessing=_evaluator.outputs['blessing']

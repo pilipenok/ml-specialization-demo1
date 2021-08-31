@@ -1,6 +1,7 @@
 from tfx import v1 as tfx
 
 from tfx.proto import trainer_pb2
+from tfx.dsl.components.base import executor_spec
 from tfx.dsl.components.common import resolver
 from tfx.dsl.experimental import latest_blessed_model_resolver
 from tfx.types import Channel
@@ -56,7 +57,7 @@ def transform(examples, schema):
 
 
 @lru_cache(maxsize=None)
-def trainer(examples=None, schema=None, transform_examples=None, transform_graph=None):
+def trainer(examples=None, schema=None, transform_graph=None):
     args = dict(
         run_fn=configs.RUN_FN,
         train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
@@ -70,8 +71,6 @@ def trainer(examples=None, schema=None, transform_examples=None, transform_graph
         args.update(examples=examples)
     if schema:
         args.update(schema=schema)
-    if transform_examples:
-        args.update(transform_examples=transform_examples)
     if transform_graph:
         args.update(transform_graph=transform_graph)
 
@@ -79,7 +78,7 @@ def trainer(examples=None, schema=None, transform_examples=None, transform_graph
 
 
 @lru_cache(maxsize=None)
-def trainer_vertex(examples=None, schema=None, transform_examples=None, transform_graph=None):
+def trainer_vertex(examples=None, schema=None, transform_graph=None):
     # See https://www.tensorflow.org/tfx/tutorials/tfx/gcp/vertex_pipelines_vertex_training
     # for tutorial example
     args = dict(
@@ -97,8 +96,6 @@ def trainer_vertex(examples=None, schema=None, transform_examples=None, transfor
         args.update(examples=examples)
     if schema:
         args.update(schema=schema)
-    if transform_examples:
-        args.update(transform_examples=transform_examples)
     if transform_graph:
         args.update(transform_graph=transform_graph)
 
@@ -158,6 +155,7 @@ def evaluator(examples, model=None, baseline_model=None):
 def pusher(model, model_blessing=None):
     args = dict(
         model=model,
+        custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
         custom_config={
             ai_platform_pusher_executor.SERVING_ARGS_KEY: configs.GCP_AI_PLATFORM_SERVING_ARGS
         }
@@ -172,6 +170,7 @@ def pusher(model, model_blessing=None):
 def pusher_vertex(model, model_blessing=None,):
     args = dict(
         model=model,
+        custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
         custom_config={
             ENABLE_VERTEX_KEY: True,
             VERTEX_REGION_KEY: configs.GOOGLE_CLOUD_REGION,

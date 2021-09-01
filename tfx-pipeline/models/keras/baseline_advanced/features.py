@@ -107,7 +107,6 @@ FEATURE_SPEC = {
         shape=[1 if '_num' in LABEL_KEY else NUM_CLASSES], 
         dtype=tf.float32 if '_num' in LABEL_KEY else tf.int64
     ),
-#     LABEL_KEY: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64),
 }
 FEATURE_SPEC['year'] = tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)
 

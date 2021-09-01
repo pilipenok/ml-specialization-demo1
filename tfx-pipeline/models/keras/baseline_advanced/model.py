@@ -98,7 +98,6 @@ def _build_keras_model() -> tf.keras.Model:
         is_holiday = categorical_column_with_vocabulary_list('is_holiday', ['true', 'false'], dtype=tf.string),
     )
     sparse.update(
-#         hour_bucket = categorical_column_with_hash_bucket('hour', 4, dtype=tf.int64),
         is_holiday_day_of_week = crossed_column([sparse['is_holiday'], sparse['day_of_week']], 2*7),
     )
     
@@ -248,13 +247,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
                 SparseCategoricalCrossentropy(from_logits=True)
             ]
         elif constants.task == 'regr':
-            loss = loss_mse() if constants.baseline else loss_mape() # tf.keras.losses.Huber() #
+            loss = loss_mse() if constants.baseline else loss_mape()
             metrics = [
                 MeanSquaredError(),
                 MeanAbsolutePercentageError(),
-                # tf.keras.metrics.RootMeanSquaredError(),
-                # tf.keras.metrics.MeanSquaredLogarithmicError(),
-                # tf.keras.metrics.LogCoshError(),
             ]
         
         model = _build_keras_model()
@@ -278,7 +274,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     )
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=tb_logdir,
-        update_freq=10,#'batch',#
+        update_freq=10,
         histogram_freq=1,
         embeddings_freq=1,
     )
@@ -286,10 +282,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
     model.fit(
         train_dataset,
         epochs=constants.EPOCHS,
-#         steps_per_epoch=fn_args.train_steps,
         steps_per_epoch=constants.TRAIN_NUM_STEPS,
         validation_data=eval_dataset,
-#         validation_steps=fn_args.eval_steps,
         validation_steps=constants.EVAL_NUM_STEPS,
         callbacks=[
             earlystopping_callback,

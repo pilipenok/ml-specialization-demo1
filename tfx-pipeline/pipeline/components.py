@@ -112,15 +112,6 @@ def evaluator(
         slicing_specs=[tfma.SlicingSpec()],
         metrics_specs=[
             tfma.MetricsSpec(metrics=[
-                # tfma.MetricConfig(
-                #     class_name='BinaryAccuracy',
-                #     threshold=tfma.MetricThreshold(
-                #         value_threshold=tfma.GenericValueThreshold(
-                #             lower_bound={'value': configs.EVAL_ACCURACY_THRESHOLD}),
-                #         change_threshold=tfma.GenericChangeThreshold(direction=tfma.MetricDirection.HIGHER_IS_BETTER,
-                #                                                      absolute={'value': -1e-10})
-                #     )
-                # )
                 tfma.MetricConfig(class_name='RootMeanSquaredError'),
                 tfma.MetricConfig(class_name='MeanAbsolutePercentageError')
             ])

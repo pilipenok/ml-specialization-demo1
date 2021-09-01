@@ -19,7 +19,7 @@ EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 0 if baseline else 3
 
 
-LABEL_KEY = 'trips_bucket' if task == 'class' else 'trips_bucket_num' # 'log_n_trips' # 'n_trips' #
+LABEL_KEY = 'trips_bucket' if task == 'class' else 'trips_bucket_num'
 
 MODEL_NAME = f"{LABEL_KEY}-"\
              f"{'baseline' if baseline else 'advanced'}"\

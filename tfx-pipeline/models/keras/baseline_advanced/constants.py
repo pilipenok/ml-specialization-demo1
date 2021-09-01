@@ -4,7 +4,7 @@ These values can be tweaked to affect model training performance.
 """
 
 
-baseline = True # False #
+baseline = True # False # 
 task = 'regr' # 'class' # 
 
 regularizer = False # True #
@@ -31,10 +31,10 @@ MODEL_NAME = f"{LABEL_KEY}-"\
 LEARNING_RATE = 0.001
 
 HIDDEN_UNITS_BASE_DEEP = [32,16,8]
-HIDDEN_UNITS_BASE_CONCAT = [32,NUM_CLASSES if task=='class' else 1]
+HIDDEN_UNITS_BASE_CONCAT = [32, NUM_CLASSES if task=='class' else 1]
 
 HIDDEN_UNITS_ADV_DEEP = [64,32,16]
 HIDDEN_UNITS_ADV_EMBED = [8]
 HIDDEN_UNITS_ADV_MIX = [16,4]
 HIDDEN_UNITS_ADV_WIDE = [512,64,4]
-HIDDEN_UNITS_ADV_CONCAT = [4,NUM_CLASSES if task=='class' else 1]
+HIDDEN_UNITS_ADV_CONCAT = [4, NUM_CLASSES if task=='class' else 1]

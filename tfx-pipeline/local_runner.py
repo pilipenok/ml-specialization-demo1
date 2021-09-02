@@ -44,7 +44,9 @@ def run():
             pipeline_name=configs.PIPELINE_NAME,
             pipeline_root=configs.LOCAL_PIPELINE_ROOT,
             metadata_connection_config=metadata.sqlite_metadata_connection_config(METADATA_PATH),
-            enable_vertex=False
+            enable_vertex=False,
+            enable_transform=False,
+            enable_hyperparameters_tuning=True
         )
     )
 

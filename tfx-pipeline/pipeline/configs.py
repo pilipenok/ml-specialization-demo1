@@ -27,7 +27,7 @@ GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
 DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/bucket_target/'
-LOCAL_DATA_PATH = '.' # local path to 'trips_small.csv'
+LOCAL_DATA_PATH = '.'  # local path to 'trips_small.csv'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -39,8 +39,8 @@ RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 MODULE_FILE = 'gs://chicago-taxi-ml-demo-1/model.py'
 SERVING_MODEL_DIR = 'gs://chicago-taxi-ml-demo-1/serving_model'
 
-TRAIN_NUM_STEPS = 10#0000
-EVAL_NUM_STEPS = 10#00
+TRAIN_NUM_STEPS = 10  # 0000
+EVAL_NUM_STEPS = 10  # 00
 EVAL_ACCURACY_THRESHOLD = 0.6
 TRAIN_BATCH_SIZE = 64
 EVAL_BATCH_SIZE = 64
@@ -57,7 +57,7 @@ GCP_AI_PLATFORM_TRAINING_ARGS = {
     # You can specify a custom container here. If not specified, TFX will use
     # a public container image matching the installed version of TFX.
     'masterConfig': {
-      'imageUri': PIPELINE_IMAGE
+        'imageUri': PIPELINE_IMAGE
     },
     # Note that if you do specify a custom container, ensure the entrypoint
     # calls into TFX's run_executor script (tfx/scripts/run_executor.py)
@@ -67,7 +67,7 @@ GCP_AI_PLATFORM_TRAINING_ARGS = {
 # Cloud AI Platform. For the full set of parameters supported by Google Cloud AI
 # Platform, refer to https://cloud.google.com/ml-engine/reference/rest/v1/projects.models
 GCP_AI_PLATFORM_SERVING_ARGS = {
-    'model_name': PIPELINE_NAME.replace('-','_'),  # '-' is not allowed.
+    'model_name': PIPELINE_NAME.replace('-', '_'),  # '-' is not allowed.
     'project_id': GOOGLE_CLOUD_PROJECT,
     # The region to use when serving the model. See available regions here:
     # https://cloud.google.com/ml-engine/docs/regions
@@ -111,14 +111,14 @@ GCP_VERTEX_AI_TRAINING_ARGS = {
     # https://cloud.google.com/ml-engine/docs/containers-overview
     # You can specify a custom container here. If not specified, TFX will use
     # a public container image matching the installed version of TFX.
-    #'masterConfig': {
+    # 'masterConfig': {
     #  'imageUri': PIPELINE_IMAGE
-    #},
+    # },
     # Note that if you do specify a custom container, ensure the entrypoint
     # calls into TFX's run_executor script (tfx/scripts/run_executor.py)
 
     'worker_pool_specs': [{
-        'machine_spec': {'machine_type': 'n1-standard-4',},
+        'machine_spec': {'machine_type': 'n1-standard-4', },
         'replica_count': 1,
         'container_spec': {
             'image_uri': 'gcr.io/tfx-oss-public/tfx:{}'.format(tfx.__version__),
@@ -133,3 +133,39 @@ if USE_GPU:
         'accelerator_type': 'NVIDIA_TESLA_K80',
         'accelerator_count': 1
     })
+
+TUNE_NUM_PARALLEL_TRIALS = 3
+# HYPERPARAMETERS = False
+HYPERPARAMETERS = {
+    "goal": 'MINIMIZE',
+    "params": [
+        {
+            "parameterName": "es_patience",
+            "type": "DISCRETE",
+            "discreteValues": [1, 3, 5]
+        },
+        {
+            "parameterName": "lr_epsilon",
+            "type": "DISCRETE",
+            "discreteValues": [1e-5, 1e-4, 1e-3, 1e-2]
+        },
+        {
+            "parameterName": "batch_size",
+            "type": "DISCRETE",
+            "discreteValues": [16, 32, 64, 128]
+        }
+    ],
+    "maxTrials": 3,
+    "maxParallelTrials": 3,
+    "maxFailedTrials": 1,
+    "hyperparameterMetricTag": 'mse',
+    "enableTrialEarlyStopping": True,
+}
+
+GCP_AI_PLATFORM_TUNING_ARGS = {
+    'project': GOOGLE_CLOUD_PROJECT,
+    'region': GOOGLE_CLOUD_REGION,
+    'masterConfig': {
+        'imageUri': PIPELINE_IMAGE
+    },
+}

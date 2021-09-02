@@ -27,7 +27,7 @@ GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
 DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips/bucket_target/'
-LOCAL_DATA_PATH = '/Users/andrey_gritsenko/Downloads/trips/' # local path to 'trips_small.csv'
+LOCAL_DATA_PATH = '.' # local path to 'trips_small.csv'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.

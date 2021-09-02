@@ -59,7 +59,8 @@ def transform(examples, schema):
 @lru_cache(maxsize=None)
 def trainer(examples=None, schema=None, transform_graph=None):
     args = dict(
-        run_fn=configs.RUN_FN,
+        #run_fn=configs.RUN_FN,
+        module_file=configs.MODULE_FILE,
         train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
         eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         custom_config={
@@ -83,8 +84,8 @@ def trainer_vertex(examples=None, schema=None, transform_graph=None):
     # for tutorial example
     args = dict(
         module_file=configs.MODULE_FILE,
-        train_args=tfx.proto.trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
-        eval_args=tfx.proto.trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
+        train_args=trainer_pb2.TrainArgs(num_steps=configs.TRAIN_NUM_STEPS),
+        eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         custom_config={
             ENABLE_VERTEX_KEY: True,
             VERTEX_REGION_KEY: configs.GOOGLE_CLOUD_REGION,

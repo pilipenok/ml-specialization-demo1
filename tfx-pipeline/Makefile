@@ -7,10 +7,10 @@ create:
 	tfx pipeline create --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
 
 update:
-	tfx pipeline update --pipeline-path=kubeflow_vertex_runner.py --endpoint=${ENDPOINT} --build-image
+	tfx pipeline update --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
 
 create:
-	tfx pipeline create --pipeline-path=kubeflow_vertex_runner.py --endpoint=${ENDPOINT} --build-image
+	tfx pipeline create --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
     
 run:
 	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint=${ENDPOINT}

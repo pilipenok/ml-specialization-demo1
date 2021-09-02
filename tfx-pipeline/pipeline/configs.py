@@ -168,4 +168,5 @@ GCP_AI_PLATFORM_TUNING_ARGS = {
     'masterConfig': {
         'imageUri': PIPELINE_IMAGE
     },
+    'hyperparameters': HYPERPARAMETERS
 }

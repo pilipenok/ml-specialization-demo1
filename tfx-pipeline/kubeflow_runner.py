@@ -48,7 +48,9 @@ def run():
         pipeline.create_pipeline(
             pipeline_name=configs.PIPELINE_NAME,
             pipeline_root=configs.PIPELINE_ROOT,
-            enable_vertex=False
+            enable_vertex=False,
+            enable_transform=False,
+            enable_hyperparameters_tuning=True
         )
     )
 

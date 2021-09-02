@@ -195,8 +195,7 @@ def tuner(
         custom_config={
             # Configures Cloud AI Platform-specific configs . For for details, see
             # https://cloud.google.com/ai-platform/training/docs/reference/rest/v1/projects.jobs#traininginput.
-            TUNING_ARGS_KEY: configs.GCP_AI_PLATFORM_TUNING_ARGS,
-            'hyperparameters': configs.HYPERPARAMETERS
+            TUNING_ARGS_KEY: configs.GCP_AI_PLATFORM_TUNING_ARGS
         }
     )
 

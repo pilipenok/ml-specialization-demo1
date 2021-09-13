@@ -8,10 +8,12 @@
 
 package com.epam.gcp.chicagotaximl.dataflow;
 
+import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.AverageFn.Accum;
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Serializable;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,9 +31,10 @@ import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
+import org.apache.beam.sdk.transforms.Combine;
+import org.apache.beam.sdk.transforms.Combine.CombineFn;
 import org.apache.beam.sdk.transforms.Count;
 import org.apache.beam.sdk.transforms.MapElements;
-import org.apache.beam.sdk.transforms.Mean;
 import org.apache.beam.sdk.transforms.SerializableFunction;
 import org.apache.beam.sdk.transforms.SimpleFunction;
 import org.apache.beam.sdk.transforms.Wait;
@@ -56,7 +59,7 @@ public class TripsPublicBqToStorage {
   private static final String DST_KEY_COLUMN = "unique_key";
   private static final String DST_TIMESTAMP_COLUMN = "processed_timestamp";
 
-  private static final TableSchema TAXI_ID_SCHEMA = new TableSchema().setFields(List.of(
+  private static final TableSchema PROCESSED_TRIPS_SCHEMA = new TableSchema().setFields(List.of(
       new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED"),
       new TableFieldSchema().setName(DST_TIMESTAMP_COLUMN).setType("TIMESTAMP")
           .setMode("REQUIRED")));
@@ -79,7 +82,7 @@ public class TripsPublicBqToStorage {
     Pipeline p = Pipeline.create(options);
 
     PCollection<Trip> trips = p.apply(
-            "Fetching a trips",
+            "Fetching trips",
             BigQueryIO.read(new TableRowToTripConverter())
                 .fromQuery(makeQuery(options))
                 .usingStandardSql()
@@ -87,33 +90,27 @@ public class TripsPublicBqToStorage {
                 .withTemplateCompatibility()
                 .withoutValidation());
 
-    WriteResult taxiIdInsertsResult = trips.apply(
+    WriteResult processedTripsInsertResult = trips.apply(
             "Saving IDs",
             BigQueryIO.<Trip>write()
-                    .withFormatFunction(new TripToTaxiIdTableRowConverter())
-                    .to(StringEscapeUtils.escapeSql(options.getDestinationTable().get()))
-                    .withSchema(TAXI_ID_SCHEMA)
+                    .withFormatFunction(new TripToProcessedTripTableRowConverter())
+                    .to(StringEscapeUtils.escapeSql(
+                        options.getDataset().get()) + ".processed_trips")
+                    .withSchema(PROCESSED_TRIPS_SCHEMA)
                     .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_NEVER)
                     .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
                     .withMethod(BigQueryIO.Write.Method.DEFAULT));
 
     PCollection<KV<String, Trip>> tripsByKey = trips.apply(
-            "Grouping the trips",
+            "Grouping trips",
             WithKeys.of(TripsPublicBqToStorage::makeAreaHourGroupingKey)
                     .withKeyType(TypeDescriptors.strings()));
 
-    PCollection<KV<String, Double>> averageFares = tripsByKey
-            .apply("Grouping the fares",
-                    MapElements.via(
-                      new SimpleFunction<KV<String, Trip>, KV<String, Float>>() {
-                        @Override
-                        public KV<String, Float> apply(KV<String, Trip> r) {
-                          return KV.of(r.getKey(), r.getValue().getFare());
-                        }
-                      }))
-            .apply("Calculating an average fare", Mean.perKey());
+    PCollection<KV<String, Double>> averageFares =
+        tripsByKey
+            .apply("Calculating average fare", Combine.perKey(new AverageFn()));
 
-    PCollection<KV<String, Long>> counts = tripsByKey.apply("Counting a number of trips",
+    PCollection<KV<String, Long>> counts = tripsByKey.apply("Calculating number of trips",
             Count.perKey());
 
     final TupleTag<Trip> tripsTag = new TupleTag<>();
@@ -124,14 +121,14 @@ public class TripsPublicBqToStorage {
             .of(tripsTag, tripsByKey)
             .and(countsTag, counts)
             .and(averagesTag, averageFares)
-            .apply("Joining the data", CoGroupByKey.create());
+            .apply("Joining data", CoGroupByKey.create());
 
     PCollection<String> csv = joined.apply(
             "Converting to CSV format",
             MapElements.via(new KvToCsvConverter(tripsTag, countsTag, averagesTag)));
 
     csv.apply("Waiting BQ inserts to finish",
-            Wait.on(taxiIdInsertsResult.getFailedInserts()))
+            Wait.on(processedTripsInsertResult.getFailedInserts()))
         .apply("Saving CSV file",
           TextIO.write()
               .to(String.format("%s/trips", options.getOutputDirectory()))
@@ -142,15 +139,51 @@ public class TripsPublicBqToStorage {
     p.run();
   }
 
+  /**
+   * Average function.
+   */
+  public static class AverageFn extends CombineFn<Trip, Accum, Double>  {
+
+    public static class Accum implements Serializable {
+      double sum = 0;
+      int count = 0;
+    }
+
+    @Override
+    public Accum createAccumulator() { return new Accum(); }
+
+    @Override
+    public Accum addInput(Accum accum, Trip input) {
+      accum.sum += input.getFare();
+      accum.count++;
+      return accum;
+    }
+
+    @Override
+    public Accum mergeAccumulators(Iterable<Accum> accums) {
+      Accum merged = createAccumulator();
+      for (Accum accum : accums) {
+        merged.sum += accum.sum;
+        merged.count += accum.count;
+      }
+      return merged;
+    }
+
+    @Override
+    public Double extractOutput(Accum accum) {
+      return ((double) accum.sum) / accum.count;
+    }
+  }
+
   @VisibleForTesting
   static double roundAverageFare(double avg) {
     return Math.round(avg * 100) / 100d;
   }
 
   /**
-   * Creates BigQuery's TableRow object for inserting into the table taxi_id.
+   * Creates BigQuery's TableRow object for inserting into the table processed_trips.
    */
-  private static class TripToTaxiIdTableRowConverter
+  private static class TripToProcessedTripTableRowConverter
           implements SerializableFunction<Trip, TableRow> {
 
     private static final String NOW = Instant.now().toString();
@@ -228,24 +261,22 @@ public class TripsPublicBqToStorage {
   public interface Options extends PipelineOptions {
 
     @Description("Location to store output CSV files (without trailing '/').")
-    @Default.String("gs://chicago-taxi-ml-demo-1/trips")
     ValueProvider<String> getOutputDirectory();
 
     void setOutputDirectory(ValueProvider<String> outputDirectory);
 
 
-    @Description("The BigQuery source table.")
-    @Default.String("chicago_taxi_ml_demo_1.taxi_trips_view")
+    @Description("BigQuery dataset.")
+    ValueProvider<String> getDataset();
+
+    void setDataset(ValueProvider<String> dataset);
+
+
+    @Description("BigQuery source table.")
+    @Default.String("processed_trips")
     ValueProvider<String> getSourceTable();
 
     void setSourceTable(ValueProvider<String> sourceTable);
-
-
-    @Description("BigQuery table that contains IDs of the processed trips.")
-    @Default.String("chicago_taxi_ml_demo_1.taxi_id")
-    ValueProvider<String> getDestinationTable();
-
-    void setDestinationTable(ValueProvider<String> destinationTable);
 
 
     @Description("A date from which the trips should be fetched from the source table.")
@@ -271,25 +302,25 @@ public class TripsPublicBqToStorage {
             + " t.pickup_community_area, "
             + " IF (h.countryRegionCode IS NULL, false, true) AS is_us_holiday, "
             + " t.fare "
-            + " FROM %s t "
-            + " LEFT JOIN chicago_taxi_ml_demo_1.national_holidays h "
+            + " FROM `%1$s.%4$s` t "
+            + " LEFT JOIN `%1$s.national_holidays` h "
             + "     ON TIMESTAMP_TRUNC(t.trip_start_timestamp, DAY) = TIMESTAMP_TRUNC(h.date, DAY) "
             + "     AND h.countryRegionCode = 'US' "
-            + " WHERE trip_start_timestamp >= TIMESTAMP(\"%s 00:00:00+00\") "
+            + " WHERE trip_start_timestamp >= TIMESTAMP(\"%2$s 00:00:00+00\") "
             + " AND t.trip_start_timestamp IS NOT NULL "
             + " AND t.trip_end_timestamp IS NOT NULL "
             + " AND t.pickup_community_area IS NOT NULL "
             + " AND t.fare IS NOT NULL "
             + " AND t.trip_start_timestamp < t.trip_end_timestamp "
             + " AND t.unique_key NOT IN "
-            + "     (SELECT unique_key FROM %s) "
+            + "     (SELECT unique_key FROM `%1$s.processed_trips`) "
             + " AND (SELECT "
             + "       ST_COVERS(b.boundaries, ST_GEOGPOINT(t.pickup_longitude, t.pickup_latitude)) "
-            + "       FROM `chicago_taxi_ml_demo_1.chicago_boundaries` b) = True "
-            + " LIMIT %d",
-    StringEscapeUtils.escapeSql(options.getSourceTable().get()),
+            + "       FROM `%1$s.chicago_boundaries` b) = True "
+            + " LIMIT %3$d",
+    StringEscapeUtils.escapeSql(options.getDataset().get()),
     options.getFromDate().get(),
-    StringEscapeUtils.escapeSql(options.getDestinationTable().get()),
-    options.getLimit().get());
+    options.getLimit().get(),
+    StringEscapeUtils.escapeSql(options.getSourceTable().get()));
   }
 }

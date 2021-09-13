@@ -1,8 +1,0 @@
-description: Allows a Dataflow pipeline to do inserts into a BigQuery table
-includedPermissions:
-- bigquery.tables.get
-- bigquery.tables.getData
-- bigquery.tables.updateData
-name: projects/o-epm-gcp-by-meetup1-ml-t1iylu/roles/ChicagoTaxiDataflowBQTaxiIdPolicy
-stage: ALPHA
-title: Chicago Taxi Dataflow BQ TaxiId Policy

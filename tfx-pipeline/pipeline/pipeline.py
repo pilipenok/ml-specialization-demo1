@@ -57,6 +57,7 @@ def create_pipeline(
     _example_validator = pc.example_validator(statistics=statistics, schema=schema)
 
     _tuner = None
+    #TODO: get saved params if tuning is off
     hyperparameters = None
     if enable_hyperparameters_tuning:
         _tuner = pc.tuner(schema=schema, examples=examples, transform_graph=transform_graph)

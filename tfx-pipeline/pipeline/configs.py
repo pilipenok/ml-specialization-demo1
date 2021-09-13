@@ -148,11 +148,6 @@ HYPERPARAMETERS = {
             "parameterName": "lr_epsilon",
             "type": "DISCRETE",
             "discreteValues": [1e-5, 1e-4, 1e-3, 1e-2]
-        },
-        {
-            "parameterName": "batch_size",
-            "type": "DISCRETE",
-            "discreteValues": [16, 32, 64, 128]
         }
     ],
     "maxTrials": 3,
@@ -168,5 +163,5 @@ GCP_AI_PLATFORM_TUNING_ARGS = {
     'masterConfig': {
         'imageUri': PIPELINE_IMAGE
     },
-    'hyperparameters': HYPERPARAMETERS
+    #'hyperparameters': HYPERPARAMETERS
 }

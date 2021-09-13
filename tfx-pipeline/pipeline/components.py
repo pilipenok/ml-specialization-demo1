@@ -20,29 +20,39 @@ from pipeline import configs
 from models.keras.baseline_advanced import features
 
 
-def example_gen():
+def example_gen() -> tfx.components.CsvExampleGen:
     # Brings data into the pipeline or otherwise joins/converts training data.
     return tfx.components.CsvExampleGen(
         input_base=configs.DATA_PATH
     )
 
 
-def statistics_gen(examples):
+def statistics_gen(
+    examples: types.Channel
+) -> tfx.components.StatisticsGen:
     # Computes statistics over data for visualization and example validation.
     return tfx.components.StatisticsGen(examples=examples)
 
 
-def schema_gen(statistics):
+def schema_gen(
+    statistics: types.Channel
+) -> tfx.components.SchemaGen:
     # Generates schema based on statistics files.
     return tfx.components.SchemaGen(statistics=statistics, infer_feature_shape=True)
 
 
-def example_validator(statistics, schema):
+def example_validator(
+    statistics: types.Channel,
+    schema: types.Channel
+) -> tfx.components.ExampleValidator:
     # Performs anomaly detection based on statistics and data schema.
     return tfx.components.ExampleValidator(statistics=statistics, schema=schema)
 
 
-def transform(examples, schema):
+def transform(
+    examples: types.Channel,
+    schema: types.Channel
+) -> tfx.components.Transform:
     # Performs transformations and feature engineering in training and serving.
     return tfx.components.Transform(
         #preprocessing_fn=configs.PREPROCESSING_FN,
@@ -52,7 +62,12 @@ def transform(examples, schema):
     )
 
 
-def trainer(examples=None, schema=None, transform_graph=None,hyperparameters=None):
+def trainer(
+    examples: Optional[types.Channel] = None,
+    schema: Optional[types.Channel] = None,
+    transform_graph: Optional[types.Channel] = None,
+    hyperparameters: Optional[types.Channel] = None
+) -> tfx.components.Trainer:
     args = dict(
         #run_fn=configs.RUN_FN,
         module_file=configs.MODULE_FILE,
@@ -75,7 +90,12 @@ def trainer(examples=None, schema=None, transform_graph=None,hyperparameters=Non
     return tfx.components.Trainer(**args).with_id('Trainer')
 
 
-def trainer_vertex(examples=None, schema=None, transform_graph=None, hyperparameters=None):
+def trainer_vertex(
+    examples: Optional[types.Channel] = None,
+    schema: Optional[types.Channel] = None,
+    transform_graph: Optional[types.Channel] = None,
+    hyperparameters: Optional[types.Channel] = None
+) -> tfx.components.Trainer:
     # See https://www.tensorflow.org/tfx/tutorials/tfx/gcp/vertex_pipelines_vertex_training
     # for tutorial example
     args = dict(
@@ -111,7 +131,11 @@ def model_resolver():
     ).with_id('latest_blessed_model_resolver')
 
 
-def evaluator(examples, model=None, baseline_model=None):
+def evaluator(
+    examples: types.Channel,
+    model: Optional[types.Channel] = None,
+    baseline_model: Optional[types.Channel] = None
+):
     # Uses TFMA to compute a evaluation statistics over features of a model and
     # perform quality validation of a candidate model (compared to a baseline).
 
@@ -148,7 +172,10 @@ def evaluator(examples, model=None, baseline_model=None):
     return tfx.components.Evaluator(**args).with_id('Evaluator')
 
 
-def pusher(model, model_blessing=None):
+def pusher(
+    model: types.Channel,
+    model_blessing: Optional[types.Channel] = None
+) -> tfx.components.Pusher:
     args = dict(
         model=model,
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),
@@ -162,7 +189,10 @@ def pusher(model, model_blessing=None):
     return tfx.components.Pusher(**args).with_id("Pusher")
 
 
-def pusher_vertex(model, model_blessing=None):
+def pusher_vertex(
+    model: types.Channel,
+    model_blessing: Optional[types.Channel] = None
+):
     args = dict(
         model=model,
         custom_executor_spec=executor_spec.ExecutorClassSpec(ai_platform_pusher_executor.Executor),

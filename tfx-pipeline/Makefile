@@ -1,10 +1,12 @@
 GOOGLE_CLOUD_PROJECT ?= o-epm-gcp-by-meetup1-ml-t1iylu
 ENDPOINT ?= https://4e0115c7a3a887cd-dot-us-central1.pipelines.googleusercontent.com
-PIPELINE_NAME ?= tfx-pipeline
+PIPELINE_NAME ?= tfx-pipeline-ml
 
 
+create:
+	tfx pipeline create --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
 
-update:
+build:
 	tfx pipeline update --pipeline-path=kubeflow_runner.py --endpoint=${ENDPOINT} --build-image
 
 create:
@@ -13,5 +15,6 @@ create:
 run:
 	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint=${ENDPOINT}
     
- 
-update-run: update run
+
+create-run: create run
+build-run: build run

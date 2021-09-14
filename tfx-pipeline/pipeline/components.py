@@ -10,8 +10,7 @@ import tensorflow_model_analysis as tfma
 from tfx.extensions.google_cloud_ai_platform.pusher import executor as ai_platform_pusher_executor
 
 from pipeline import configs
-#from models.features import LABEL_KEY
-LABEL_KEY = 'relative_demand'
+from models.keras.baseline_advanced import features
 
 from functools import lru_cache
 
@@ -109,19 +108,12 @@ def evaluator(
     # perform quality validation of a candidate model (compared to a baseline).
 
     eval_config = tfma.EvalConfig(
-        model_specs=[tfma.ModelSpec(label_key=LABEL_KEY)],
+        model_specs=[tfma.ModelSpec(label_key=features.LABEL_KEY)],
         slicing_specs=[tfma.SlicingSpec()],
         metrics_specs=[
             tfma.MetricsSpec(metrics=[
-                tfma.MetricConfig(
-                    class_name='BinaryAccuracy',
-                    threshold=tfma.MetricThreshold(
-                        value_threshold=tfma.GenericValueThreshold(
-                            lower_bound={'value': configs.EVAL_ACCURACY_THRESHOLD}),
-                        change_threshold=tfma.GenericChangeThreshold(direction=tfma.MetricDirection.HIGHER_IS_BETTER,
-                                                                     absolute={'value': -1e-10})
-                    )
-                )
+                tfma.MetricConfig(class_name='RootMeanSquaredError'),
+                tfma.MetricConfig(class_name='MeanAbsolutePercentageError')
             ])
         ])
 

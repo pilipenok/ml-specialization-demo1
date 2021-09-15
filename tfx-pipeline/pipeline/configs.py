@@ -39,11 +39,11 @@ RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 MODULE_FILE = 'gs://chicago-taxi-ml-demo-1/model.py'
 SERVING_MODEL_DIR = 'gs://chicago-taxi-ml-demo-1/serving_model'
 
-TRAIN_NUM_STEPS = 10  # 0000
-EVAL_NUM_STEPS = 10  # 00
-EVAL_ACCURACY_THRESHOLD = 0.6
-TRAIN_BATCH_SIZE = 64
-EVAL_BATCH_SIZE = 64
+TRAIN_NUM_STEPS = 100
+EVAL_NUM_STEPS = 10
+# EVAL_ACCURACY_THRESHOLD = 0.6
+# TRAIN_BATCH_SIZE = 16
+# EVAL_BATCH_SIZE = 16
 
 USE_GPU = False
 # A dict which contains the training job parameters to be passed to Google

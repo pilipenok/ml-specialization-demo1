@@ -214,7 +214,6 @@ EOF
 resource "google_bigquery_table" "ChicagoBoundariesRaw" {
   dataset_id          = google_bigquery_dataset.ChicagoTaxi.dataset_id
   table_id            = "chicago_boundaries_raw"
-  description         = "The table is required only during the initial setup process as a source for `${google_bigquery_table.ChicagoBoundaries.dataset_id}.${google_bigquery_table.ChicagoBoundaries.table_id}`"
   deletion_protection = false
   depends_on = [
     google_storage_bucket_object.ChicagoBoundaries

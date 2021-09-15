@@ -16,10 +16,6 @@ variable "service-account-key-location" {
   type = string
 }
 
-variable "env" {
-  type = string
-}
-
 variable "dataflow-system-files-bucket" {
   type = string
 }
@@ -140,7 +136,7 @@ resource "google_storage_bucket_object" "CleanupFunctionSource" {
   bucket = google_storage_bucket.FunctionsSystemFiles.id
 }
 
-//  Topic to execute TriggerFunction from Cloud Scheduler
+// Topic to execute TriggerFunction from Cloud Scheduler
 resource "google_pubsub_topic" "PipelineTrigger" {
   name = "chicago-taxi-trigger"
 }
@@ -236,15 +232,10 @@ resource "google_bigquery_table" "ChicagoBoundaries" {
   dataset_id          = google_bigquery_dataset.ChicagoTaxi.dataset_id
   table_id            = "chicago_boundaries"
   deletion_protection = false
-  schema              = <<EOF
-[
-  {
-    "mode": "REQUIRED",
-    "name": "boundaries",
-    "type": "GEOGRAPHY"
+  view {
+    use_legacy_sql = false
+    query          = "SELECT ST_GEOGFROMTEXT(the_geom) AS boundaries FROM `${google_bigquery_table.ChicagoBoundariesRaw.dataset_id}.${google_bigquery_table.ChicagoBoundariesRaw.table_id}`"
   }
-]
-EOF
 }
 
 resource "google_bigquery_table" "NationalHolidays" {
@@ -310,20 +301,6 @@ resource "google_project_iam_custom_role" "StorageWriter" {
   ]
 }
 
-resource "google_project_iam_custom_role" "DataflowStorageSystemAccess" {
-  role_id     = "ChicagoTaxiDataflowStorageSystemAccess"
-  title       = "Chicago Taxi Dataflow Storage System Access"
-  description = "Allows a Dataflow to create/read the pipeline template and create/delete temporary files."
-  permissions = [
-    "storage.buckets.get",
-    "storage.objects.create",
-    "storage.objects.delete",
-    "storage.objects.get",
-    "storage.objects.getIamPolicy",
-    "storage.objects.list"
-  ]
-}
-
 # PipelineScheduler Service Account and IAM
 
 resource "google_service_account" "PipelineScheduler" {
@@ -351,9 +328,8 @@ resource "google_service_account" "TriggerFunction" {
 resource "google_project_iam_custom_role" "TriggerFunction" {
   role_id     = "ChicagoTaxiTriggerFunction"
   title       = "Chicago Taxi Trigger Function"
-  description = "A role for a service account that runs ${google_cloudfunctions_function.TriggerFunction.name}."
+  description = "A role for a service account that runs TriggerFunction."
   permissions = [
-    "compute.machineTypes.get",
     "dataflow.jobs.create",
     "iam.serviceAccounts.actAs",
     "resourcemanager.projects.get",
@@ -369,13 +345,6 @@ resource "google_project_iam_member" "TriggerFunction" {
 resource "google_bigquery_table_iam_member" "TriggerFunction_TaxiTripsViewReader" {
   dataset_id = google_bigquery_table.TaxiTripsView.dataset_id
   table_id   = google_bigquery_table.TaxiTripsView.id
-  role       = google_project_iam_custom_role.BigQueryReader.id
-  member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
-}
-
-resource "google_bigquery_table_iam_member" "TriggerFunction_TaxiTripsSampleReader" {
-  dataset_id = google_bigquery_dataset.ChicagoTaxi.dataset_id
-  table_id   = "taxi_trips_sample"
   role       = google_project_iam_custom_role.BigQueryReader.id
   member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
 }
@@ -408,6 +377,13 @@ resource "google_bigquery_table_iam_member" "TriggerFunction_ChicagoBoundariesRe
   member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
 }
 
+resource "google_bigquery_table_iam_member" "TriggerFunction_ChicagoBoundariesRawReader" {
+  dataset_id = google_bigquery_table.ChicagoBoundariesRaw.dataset_id
+  table_id   = google_bigquery_table.ChicagoBoundariesRaw.id
+  role       = google_project_iam_custom_role.BigQueryReader.id
+  member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
+}
+
 resource "google_storage_bucket_iam_member" "TriggerFunction_SystemStorageReader" {
   bucket = google_storage_bucket.DataflowSystemFiles.id
   role   = "roles/storage.objectViewer"
@@ -428,11 +404,9 @@ resource "google_project_iam_custom_role" "TripsDataflow" {
   description = "A role for a Dataflow worker service account."
   permissions = [
     "bigquery.datasets.create",
-    "bigquery.datasets.get",
     "bigquery.jobs.create",
     "bigquery.readsessions.create",
     "bigquery.readsessions.getData",
-    "bigquery.readsessions.update"
   ]
 }
 
@@ -453,13 +427,6 @@ resource "google_bigquery_table_iam_member" "TripsDataflow_TaxiTripsViewReader" 
   member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
 
-resource "google_bigquery_table_iam_member" "TripsDataflow_TaxiTripsSampleReader" {
-  dataset_id = google_bigquery_dataset.ChicagoTaxi.dataset_id
-  table_id   = "projects/${var.project}/datasets/${var.dataset}/tables/taxi_trips_sample"
-  role       = google_project_iam_custom_role.BigQueryReader.id
-  member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
-}
-
 resource "google_bigquery_table_iam_member" "TripsDataflow_NationalHolidaysReader" {
   dataset_id = google_bigquery_table.NationalHolidays.dataset_id
   table_id   = google_bigquery_table.NationalHolidays.id
@@ -474,15 +441,9 @@ resource "google_bigquery_table_iam_member" "TripsDataflow_ProcessedTripsReader"
   member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
 
-resource "google_storage_bucket_iam_member" "TripsDataflow_SystemStorageWriter" {
-  bucket = google_storage_bucket.DataflowSystemFiles.id
-  role   = google_project_iam_custom_role.DataflowStorageSystemAccess.id
-  member = "serviceAccount:${google_service_account.TripsDataflow.email}"
-}
-
 resource "google_storage_bucket_iam_member" "TripsDataflow_TempStorageWriter" {
   bucket = google_storage_bucket.DataflowTempFiles.id
-  role   = google_project_iam_custom_role.DataflowStorageSystemAccess.id
+  role   = google_project_iam_custom_role.StorageWriter.id
   member = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
 
@@ -507,7 +468,7 @@ resource "google_service_account" "CleanupFunction" {
 resource "google_project_iam_custom_role" "CleanupFunction" {
   role_id     = "ChicagoTaxiCleanupFunction"
   title       = "Chicago Taxi Cleanup Function"
-  description = "A role for a service account that runs ${google_cloudfunctions_function.CleanupFunction.name}"
+  description = "A role for a service account that runs CleanupFunction"
   permissions = [
     "bigquery.jobs.create"
   ]
@@ -530,7 +491,7 @@ resource "google_cloudfunctions_function" "TriggerFunction" {
   name                  = "chicago-taxi-trigger-function"
   runtime               = "java11"
   available_memory_mb   = 256
-  entry_point           = "com.epam.gcp.chicagotaximl.triggerfunction.TriggerFunction"
+  entry_point           = "com.epam.gcp.chicagotaximl.triggerfunction.TriggerFunctionPubSubEvent"
   service_account_email = google_service_account.TriggerFunction.email
   max_instances         = 1
   event_trigger {
@@ -544,14 +505,14 @@ resource "google_cloudfunctions_function" "TriggerFunction" {
   source_archive_object = google_storage_bucket_object.TriggerFunctionSource.name
   environment_variables = {
     project           = var.project
-    dataflow-job-name = "chicago-taxi-public-bq-to-csv"
-    gcs-path          = "gs://${google_storage_bucket.DataflowSystemFiles.id}/public-bq-to-csv/template"
-    temp-location     = "gs://${google_storage_bucket.DataflowTempFiles.id}/public-bq-to-csv"
-    service-account   = google_service_account.TripsDataflow.email
+    dataflow_job_name = "chicago-taxi-public-bq-to-csv"
+    gcs_path          = "gs://${google_storage_bucket.DataflowSystemFiles.id}/public-bq-to-csv/template"
+    temp_location     = "gs://${google_storage_bucket.DataflowTempFiles.id}/public-bq-to-csv"
+    service_account   = google_service_account.TripsDataflow.email
     region            = local.region
     dataset           = google_bigquery_dataset.ChicagoTaxi.dataset_id
-    source-table      = var.source-table
-    start-date        = "2020-04-01"
+    source_table      = var.source-table
+    start_date        = "2020-04-01"
   }
 }
 
@@ -560,13 +521,16 @@ resource "google_cloudfunctions_function" "CleanupFunction" {
   name                  = "chicago-taxi-cleanup-function"
   runtime               = "java11"
   available_memory_mb   = 256
-  entry_point           = "com.epam.gcp.chicagotaximl.cleanupfunction.CleanupFunction"
+  entry_point           = "com.epam.gcp.chicagotaximl.cleanupfunction.CleanupFunctionStorageEvent"
   service_account_email = google_service_account.CleanupFunction.email
   max_instances         = 1
   event_trigger {
     event_type = "google.storage.object.finalize"
     resource   = google_storage_bucket.ChicagoTaxi.id
   }
+  depends_on = [
+    google_storage_bucket_object.CleanupFunctionSource
+  ]
   source_archive_bucket = google_storage_bucket_object.CleanupFunctionSource.bucket
   source_archive_object = google_storage_bucket_object.CleanupFunctionSource.name
   environment_variables = {
@@ -579,11 +543,8 @@ resource "google_cloudfunctions_function" "CleanupFunction" {
 resource "google_cloud_scheduler_job" "TriggerFunction" {
   name        = "chicago-taxi-trigger"
   schedule    = "0 4 * * *"
-  description = "Runs ${google_cloudfunctions_function.TriggerFunction.name} via Pub/Sub topic ${google_pubsub_topic.PipelineTrigger.name}"
+  description = "Runs TriggerFunction via Pub/Sub topic ${google_pubsub_topic.PipelineTrigger.name}"
   time_zone   = "Atlantic/St_Helena" // UTC
-  // In the organization's project the App Engine app is located in europe-west3 region,
-  // so we have to do europe-west3 as well
-  region = "europe-west3"
   pubsub_target {
     topic_name = google_pubsub_topic.PipelineTrigger.id
     data       = base64encode("1")

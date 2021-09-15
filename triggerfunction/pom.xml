@@ -16,6 +16,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
+    <mockito.version>3.11.2</mockito.version>
+    <spring.version>5.3.9</spring.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -69,7 +71,14 @@
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
-      <version>3.11.2</version>
+      <version>${mockito.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- https://mvnrepository.com/artifact/org.mockito/mockito-inline -->
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-inline</artifactId>
+      <version>${mockito.version}</version>
       <scope>test</scope>
     </dependency>
     <!-- https://mvnrepository.com/artifact/commons-lang/commons-lang -->
@@ -77,6 +86,26 @@
       <groupId>commons-lang</groupId>
       <artifactId>commons-lang</artifactId>
       <version>2.6</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloudevent-types</artifactId>
+      <version>0.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-beans</artifactId>
+      <version>${spring.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework</groupId>
+      <artifactId>spring-context</artifactId>
+      <version>${spring.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-logging</artifactId>
+      <version>3.1.1</version>
     </dependency>
   </dependencies>
 
@@ -128,7 +157,7 @@
           <artifactId>function-maven-plugin</artifactId>
           <version>0.9.7</version>
           <configuration>
-            <functionTarget>com.epam.gcp.chicagotaximl.triggerfunction.DataflowTriggerHttpFunction</functionTarget>
+            <functionTarget>com.epam.gcp.chicagotaximl.triggerfunction.TriggerFunctionPubSubEvent</functionTarget>
           </configuration>
         </plugin>
       </plugins>

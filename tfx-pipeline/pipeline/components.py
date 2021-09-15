@@ -223,7 +223,7 @@ def tuner(
         eval_args=trainer_pb2.EvalArgs(num_steps=configs.EVAL_NUM_STEPS),
         tune_args=tuner_pb2.TuneArgs(num_parallel_trials=configs.TUNE_NUM_PARALLEL_TRIALS),
         custom_config={
-            # Configures Cloud AI Platform-specific configs . For for details, see
+            # Configures Cloud AI Platform-specific configs. For details, see
             # https://cloud.google.com/ai-platform/training/docs/reference/rest/v1/projects.jobs#traininginput.
             TUNING_ARGS_KEY: configs.GCP_AI_PLATFORM_TUNING_ARGS
         }

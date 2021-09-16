@@ -21,8 +21,8 @@ import os
 import tfx
 
 PIPELINE_NAME = 'tfx-pipeline-ml'
-GOOGLE_CLOUD_PROJECT = 'o-epm-gcp-by-meetup1-ml-t1iylu'
-GCS_BUCKET_NAME = 'chicago-taxi-ml-demo-1'
+GOOGLE_CLOUD_PROJECT = 'or2--epm-gcp-by-meetup2-t1iylu'
+GCS_BUCKET_NAME = 'epm-spec-chicago-taxi'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
@@ -36,8 +36,8 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
-MODULE_FILE = 'gs://chicago-taxi-ml-demo-1/model.py'
-SERVING_MODEL_DIR = 'gs://chicago-taxi-ml-demo-1/serving_model'
+MODULE_FILE = f'gs://{GCS_BUCKET_NAME}/model.py'
+SERVING_MODEL_DIR = f'gs://{GCS_BUCKET_NAME}/serving_model'
 
 TRAIN_NUM_STEPS = 100
 EVAL_NUM_STEPS = 10

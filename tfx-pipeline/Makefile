@@ -1,5 +1,5 @@
-GOOGLE_CLOUD_PROJECT ?= o-epm-gcp-by-meetup1-ml-t1iylu
-ENDPOINT ?= https://4e0115c7a3a887cd-dot-us-central1.pipelines.googleusercontent.com
+GOOGLE_CLOUD_PROJECT ?= or2--epm-gcp-by-meetup2-t1iylu
+ENDPOINT ?= https://4fe2a1125fd9595a-dot-us-central1.pipelines.googleusercontent.com
 PIPELINE_NAME ?= tfx-pipeline-ml
 
 

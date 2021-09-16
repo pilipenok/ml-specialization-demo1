@@ -14,7 +14,8 @@ create:
     
 run:
 	tfx run create --pipeline-name ${PIPELINE_NAME} --endpoint=${ENDPOINT}
-    
 
 create-run: create run
 build-run: build run
+
+update-run: update run

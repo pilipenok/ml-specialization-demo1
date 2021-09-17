@@ -50,7 +50,7 @@ def run():
             pipeline_root=configs.PIPELINE_ROOT,
             enable_vertex=False,
             enable_transform=False,
-            enable_hyperparameters_tuning=True
+            enable_hyperparameters_tuning=False
         )
     )
 

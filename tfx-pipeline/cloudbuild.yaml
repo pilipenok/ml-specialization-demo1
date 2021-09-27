@@ -1,0 +1,17 @@
+steps:
+  # Install dependencies
+  - name: python:3.8-slim
+    entrypoint: pip
+    args: ["install", "-r", "requirements.txt", "--user"]
+    
+  # create job_spec
+  - name: python:3.8-slim
+    entrypoint: python
+    args: ["vertex_compile.py"]
+
+ 
+#   - name: google/cloud-sdk
+#     args: ['gcloud', 'run', 'deploy', 'helloworld', 
+#            '--image=us-central1-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/myimage:$SHORT_SHA', 
+#            '--region', 'us-central1', '--platform', 'managed', 
+#            '--allow-unauthenticated']

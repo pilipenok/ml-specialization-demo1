@@ -1,9 +1,5 @@
 from kfp.v2.google import client
-
-from absl import logging
-
 from pipeline import configs
-from pipeline import pipeline
 
 
 PIPELINE_NAME = configs.PIPELINE_NAME
@@ -22,5 +18,4 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.set_verbosity(logging.INFO)
     main()

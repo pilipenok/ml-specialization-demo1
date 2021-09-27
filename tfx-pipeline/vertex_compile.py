@@ -9,6 +9,8 @@ from pipeline import pipeline
 PIPELINE_NAME = configs.PIPELINE_NAME
 PIPELINE_DEFINITION_FILE = PIPELINE_NAME + '_pipeline.json'
 GS_PIPELINE_DEFINITION_URI = f'gs://{configs.GCS_BUCKET_NAME}/{PIPELINE_DEFINITION_FILE}'
+MODEL_PATH = '../models/keras/baseline_advanced/model.py'
+GS_MODEL_URI = configs.MODULE_FILE
 
 
 def main():
@@ -31,10 +33,11 @@ def main():
         )
     )
 
-    print(f'Uploading to {GS_PIPELINE_DEFINITION_URI}')
-    blob = storage.Blob.from_string(GS_PIPELINE_DEFINITION_URI, client=storage.Client())
-    blob.upload_from_filename(PIPELINE_DEFINITION_FILE)
-    
+    print(f'Uploading pipeline to {GS_PIPELINE_DEFINITION_URI}')
+    client=storage.Client()
+    storage.Blob.from_string(GS_PIPELINE_DEFINITION_URI, client=client).upload_from_filename(PIPELINE_DEFINITION_FILE)
+    print(f'Uploading model to {GS_MODEL_URI}')
+    storage.Blob.from_string(GS_MODEL_URI, client=client).upload_from_filename(MODEL_PATH)
     print('Done.')
 
 

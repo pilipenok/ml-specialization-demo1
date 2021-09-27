@@ -12,6 +12,7 @@ GS_PIPELINE_DEFINITION_URI = f'gs://{configs.GCS_BUCKET_NAME}/{PIPELINE_DEFINITI
 
 
 def main():
+    print(f'Compiling to {PIPELINE_DEFINITION_FILE}')
     runner_config = KubeflowV2DagRunnerConfig(
         display_name='tfx-vertex-pipeline-{}'.format(PIPELINE_NAME),
         default_image='us.gcr.io/or2--epm-gcp-by-meetup2-t1iylu/taxi-pipeline-vertex',
@@ -30,7 +31,11 @@ def main():
         )
     )
 
-    storage.Blob.from_string(GS_PIPELINE_DEFINITION_URI).upload_from_filename(PIPELINE_DEFINITION_FILE)
+    print(f'Uploading to {GS_PIPELINE_DEFINITION_URI}')
+    blob = storage.Blob.from_string(GS_PIPELINE_DEFINITION_URI, client=storage.Client())
+    blob.upload_from_filename(PIPELINE_DEFINITION_FILE)
+    
+    print('Done.')
 
 
 if __name__ == '__main__':

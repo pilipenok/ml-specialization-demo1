@@ -9,7 +9,7 @@ from pipeline import pipeline
 PIPELINE_NAME = configs.PIPELINE_NAME
 PIPELINE_DEFINITION_FILE = PIPELINE_NAME + '_pipeline.json'
 GS_PIPELINE_DEFINITION_URI = f'gs://{configs.GCS_BUCKET_NAME}/{PIPELINE_DEFINITION_FILE}'
-MODEL_PATH = '../models/keras/baseline_advanced/model.py'
+MODEL_PATH = 'models/keras/baseline_advanced/model.py'
 GS_MODEL_URI = configs.MODULE_FILE
 
 

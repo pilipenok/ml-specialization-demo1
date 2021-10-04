@@ -1,17 +1,31 @@
 steps:
-  # Install dependencies
-  - name: python:3.8-slim
-    entrypoint: pip
-    args: ["install", "-r", "requirements.txt", "--user"]
-    
-  # create job_spec
-  - name: python:3.8-slim
-    entrypoint: python
-    args: ["vertex_compile.py"]
-
- 
-#   - name: google/cloud-sdk
-#     args: ['gcloud', 'run', 'deploy', 'helloworld', 
-#            '--image=us-central1-docker.pkg.dev/$PROJECT_ID/$_REPO_NAME/myimage:$SHORT_SHA', 
-#            '--region', 'us-central1', '--platform', 'managed', 
-#            '--allow-unauthenticated']
+  - name: gcr.io/cloud-builders/git
+    args:
+      - '-c'
+      - |
+        echo "$$SSHKEY" > /root/.ssh/id_rsa
+        chmod 400 /root/.ssh/id_rsa
+        ssh-keyscan git.epam.com > /root/.ssh/known_hosts
+    entrypoint: bash
+    secretEnv:
+      - SSHKEY
+    volumes:
+      - name: ssh
+        path: /root/.ssh
+  - name: gcr.io/cloud-builders/git
+    args:
+      - clone
+      - git@git.epam.com:epm-gcp/ml-specialization-demo1.git
+    entrypoint: git
+    volumes:
+      - name: ssh
+        path: /root/.ssh
+  - name: 'python:3.7-slim'
+    entrypoint: /bin/sh
+    args:
+      - -c
+      - 'cd ml-specialization-demo1/tfx-pipeline && pip install -r requirements.txt && python vertex_compile.py'
+availableSecrets:
+  secretManager:
+    - versionName: projects/877218744686/secrets/ssh-gitlab-secret/versions/1
+      env: SSHKEY

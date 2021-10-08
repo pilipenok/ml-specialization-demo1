@@ -46,7 +46,7 @@ EVAL_BATCH_SIZE = 16
 EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 0 if BASELINE else 3
 
-LABEL_KEY = 'trips_bucket' if TASK == 'class' else 'trips_bucket_num'  # 'n_trips'  # 'log_n_trips' #
+LABEL_KEY = 'trips_bucket' # if TASK == 'class' else 'trips_bucket_num'  # 'n_trips'  # 'log_n_trips' #
 
 MODEL_NAME = f"{LABEL_KEY}-" \
              f"{'baseline' if BASELINE else 'advanced'}" \

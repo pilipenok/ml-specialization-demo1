@@ -41,6 +41,7 @@ public class CleanupFunctionTest {
 
   @BeforeAll
   void createBigQueryTable() throws Exception {
+    bigQueryTesting.createTableMlDataset();
     bigQueryTesting.createTableProcessedTrips();
     bigQueryTesting.insertProcessedTrips(List.of(
         List.of("1", Timestamp.parseTimestamp("2020-12-01T10:15:30.000Z").toString()),

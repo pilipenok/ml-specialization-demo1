@@ -48,6 +48,9 @@ public class BigQueryDao {
           + "WHERE processed_timestamp IS NULL "
           + "LIMIT 1";
 
+  private static final String ML_DATASET_STATE_QUERY =
+      "SELECT area FROM `%1$s.ml_dataset` LIMIT 1";
+
   @VisibleForTesting
   public static final String NEW_TRIPS_QUERY =
            "INSERT INTO `%1$s.processed_trips` (unique_key) "
@@ -239,6 +242,16 @@ public class BigQueryDao {
   public boolean verifyPreprocessedState() throws InterruptedException {
     Builder queryBuilder = QueryJobConfiguration.newBuilder(
         String.format(PROCESSED_STATE_QUERY, StringEscapeUtils.escapeSql(dataset)));
+    TableResult results = bigquery.query(queryBuilder.build());
+    return results.getTotalRows() == 0;
+  }
+
+  /**
+   * Returns False if the state of 'ml_dataset' table is invalid.
+   */
+  public boolean verifyMlDatasetState() throws InterruptedException {
+    Builder queryBuilder = QueryJobConfiguration.newBuilder(
+        String.format(ML_DATASET_STATE_QUERY, StringEscapeUtils.escapeSql(dataset)));
     TableResult results = bigquery.query(queryBuilder.build());
     return results.getTotalRows() == 0;
   }

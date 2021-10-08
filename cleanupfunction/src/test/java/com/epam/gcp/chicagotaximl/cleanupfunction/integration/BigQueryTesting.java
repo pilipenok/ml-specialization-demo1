@@ -41,6 +41,7 @@ import lombok.Getter;
 public class BigQueryTesting implements Closeable {
 
   private static final String PROCESSED_TRIPS_TABLE = "processed_trips";
+  private static final String ML_DATASET_TABLE = "ml_dataset";
 
   private final RemoteBigQueryHelper bigqueryHelper = RemoteBigQueryHelper.create();
 
@@ -54,11 +55,16 @@ public class BigQueryTesting implements Closeable {
       Field.of("unique_key", StandardSQLTypeName.STRING),
       Field.of("processed_timestamp", StandardSQLTypeName.TIMESTAMP));
 
+  private static final List<Field> ML_DATASET_FIELDS = Arrays.asList(
+      Field.of("some_field", StandardSQLTypeName.STRING));
+
   private TableId processedTripsTable;
+  private TableId mlDatasetTable;
 
   public BigQueryTesting() {
     bigquery.create(DatasetInfo.newBuilder(dataset).build());
     processedTripsTable = TableId.of(dataset, PROCESSED_TRIPS_TABLE);
+    mlDatasetTable = TableId.of(dataset, ML_DATASET_TABLE);
   }
 
   @Override
@@ -68,6 +74,10 @@ public class BigQueryTesting implements Closeable {
 
   public void createTableProcessedTrips() {
     createTable(processedTripsTable, PROCESSED_TRIPS_FIELDS);
+  }
+
+  public void createTableMlDataset() {
+    createTable(mlDatasetTable, ML_DATASET_FIELDS);
   }
 
   private void createTable(TableId tableId, Iterable<Field> fields) {

@@ -52,8 +52,7 @@ terraform init
      --subnetwork=https://www.googleapis.com/compute/v1/projects/<PROJECT_ID>/regions/us-central1/subnetworks/dataflow \
      --templateLocation=gs://<SYSTEM_FILES_BUCKET>/public-bq-to-csv/template \
      --dataset=<DATASET_NAME> \
-     --outputDirectory=gs://<OUTPUT_BUCKET>/trips \
-     --sourceTable=taxi_trips_view"
+     --outputDirectory=gs://<OUTPUT_BUCKET>/trips"
 
 10. Disable the service account with the owner role. (if required)
 

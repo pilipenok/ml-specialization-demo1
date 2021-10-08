@@ -8,70 +8,42 @@
 
 package com.epam.gcp.chicagotaximl.dataflow;
 
-import com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage.AverageFn.Accum;
-import com.google.api.services.bigquery.model.TableFieldSchema;
-import com.google.api.services.bigquery.model.TableRow;
-import com.google.api.services.bigquery.model.TableSchema;
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Serializable;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import lombok.AllArgsConstructor;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO.TypedRead.Method;
 import org.apache.beam.sdk.io.gcp.bigquery.SchemaAndRecord;
-import org.apache.beam.sdk.io.gcp.bigquery.WriteResult;
 import org.apache.beam.sdk.options.Default;
 import org.apache.beam.sdk.options.Description;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
-import org.apache.beam.sdk.transforms.Combine;
-import org.apache.beam.sdk.transforms.Combine.CombineFn;
-import org.apache.beam.sdk.transforms.Count;
-import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.SerializableFunction;
-import org.apache.beam.sdk.transforms.SimpleFunction;
-import org.apache.beam.sdk.transforms.Wait;
-import org.apache.beam.sdk.transforms.WithKeys;
-import org.apache.beam.sdk.transforms.join.CoGbkResult;
-import org.apache.beam.sdk.transforms.join.CoGroupByKey;
-import org.apache.beam.sdk.transforms.join.KeyedPCollectionTuple;
-import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.sdk.values.TupleTag;
-import org.apache.beam.sdk.values.TypeDescriptors;
 import org.apache.commons.lang.StringEscapeUtils;
 
 /**
  * Apache Beam pipeline.
  * Retrieves data from a public BigQuery table `bigquery-public-data.chicago_taxi_trips.taxi_trips`,
- * and saves it into a Cloud Storage bucket. The subsequent executions will only read
- * new records.
+ * and saves it into a Cloud Storage bucket.
  */
 public class TripsPublicBqToStorage {
 
-  private static final String DST_KEY_COLUMN = "unique_key";
-  private static final String DST_TIMESTAMP_COLUMN = "processed_timestamp";
+  private static final String CSV_HEADER =  "area,year,"
+      + "quarter,quarter_num,quarter_cos,quarter_sin,"
+      + "month,month_num,month_cos,month_sin,"
+      + "day,day_num,day_cos,day_sin,"
+      + "hour,hour_num,hour_cos,hour_sin,"
+      + "day_period,"
+      + "week,week_num,week_cos,week_sin,"
+      + "day_of_week,day_of_week_num,day_of_week_cos,day_of_week_sin,"
+      + "weekday_hour_num,weekday_hour_cos,weekday_hour_sin,"
+      + "yearday_hour_num,yearday_hour_cos,yearday_hour_sin,"
+      + "is_weekend,is_holiday,n_trips,n_trips_num,log_n_trips,trips_bucket,trips_bucket_num";
 
-  private static final TableSchema PROCESSED_TRIPS_SCHEMA = new TableSchema().setFields(List.of(
-      new TableFieldSchema().setName(DST_KEY_COLUMN).setType("STRING").setMode("REQUIRED"),
-      new TableFieldSchema().setName(DST_TIMESTAMP_COLUMN).setType("TIMESTAMP")
-          .setMode("REQUIRED")));
-
-  private static String CSV_HEADER =  "pickup_community_area,"
-                                        + "day_of_week,"
-                                        + "is_us_holiday,"
-                                        + "month,"
-                                        + "hour_of_day,"
-                                        + "am_pm,"
-                                        + "avg_fare_per_trip,"
-                                        + "number_of_trips";
+  private static final String[] HEADERS = CSV_HEADER.split(",");
 
   /**
    * An entry point for the Apache Beam pipeline.
@@ -80,56 +52,17 @@ public class TripsPublicBqToStorage {
     Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
 
     Pipeline p = Pipeline.create(options);
-
-    PCollection<Trip> trips = p.apply(
+    
+    PCollection<String> csv = p.apply(
             "Fetching trips",
-            BigQueryIO.read(new TableRowToTripConverter())
+            BigQueryIO.read(new TableRowToCsv())
                 .fromQuery(makeQuery(options))
                 .usingStandardSql()
                 .withMethod(Method.DIRECT_READ)
                 .withTemplateCompatibility()
                 .withoutValidation());
 
-    WriteResult processedTripsInsertResult = trips.apply(
-            "Saving IDs",
-            BigQueryIO.<Trip>write()
-                    .withFormatFunction(new TripToProcessedTripTableRowConverter())
-                    .to(StringEscapeUtils.escapeSql(
-                        options.getDataset().get()) + ".processed_trips")
-                    .withSchema(PROCESSED_TRIPS_SCHEMA)
-                    .withCreateDisposition(BigQueryIO.Write.CreateDisposition.CREATE_NEVER)
-                    .withWriteDisposition(BigQueryIO.Write.WriteDisposition.WRITE_APPEND)
-                    .withMethod(BigQueryIO.Write.Method.DEFAULT));
-
-    PCollection<KV<String, Trip>> tripsByKey = trips.apply(
-            "Grouping trips",
-            WithKeys.of(TripsPublicBqToStorage::makeAreaHourGroupingKey)
-                    .withKeyType(TypeDescriptors.strings()));
-
-    PCollection<KV<String, Double>> averageFares =
-        tripsByKey
-            .apply("Calculating average fare", Combine.perKey(new AverageFn()));
-
-    PCollection<KV<String, Long>> counts = tripsByKey.apply("Calculating number of trips",
-            Count.perKey());
-
-    final TupleTag<Trip> tripsTag = new TupleTag<>();
-    final TupleTag<Long> countsTag = new TupleTag<>();
-    final TupleTag<Double> averagesTag = new TupleTag<>();
-
-    PCollection<KV<String, CoGbkResult>> joined = KeyedPCollectionTuple
-            .of(tripsTag, tripsByKey)
-            .and(countsTag, counts)
-            .and(averagesTag, averageFares)
-            .apply("Joining data", CoGroupByKey.create());
-
-    PCollection<String> csv = joined.apply(
-            "Converting to CSV format",
-            MapElements.via(new KvToCsvConverter(tripsTag, countsTag, averagesTag)));
-
-    csv.apply("Waiting BQ inserts to finish",
-            Wait.on(processedTripsInsertResult.getFailedInserts()))
-        .apply("Saving CSV file",
+    csv.apply("Saving CSV file",
           TextIO.write()
               .to(String.format("%s/trips", options.getOutputDirectory()))
               .withHeader(CSV_HEADER)
@@ -140,119 +73,22 @@ public class TripsPublicBqToStorage {
   }
 
   /**
-   * Average function.
-   */
-  public static class AverageFn extends CombineFn<Trip, Accum, Double>  {
-
-    public static class Accum implements Serializable {
-      double sum = 0;
-      int count = 0;
-    }
-
-    @Override
-    public Accum createAccumulator() { return new Accum(); }
-
-    @Override
-    public Accum addInput(Accum accum, Trip input) {
-      accum.sum += input.getFare();
-      accum.count++;
-      return accum;
-    }
-
-    @Override
-    public Accum mergeAccumulators(Iterable<Accum> accums) {
-      Accum merged = createAccumulator();
-      for (Accum accum : accums) {
-        merged.sum += accum.sum;
-        merged.count += accum.count;
-      }
-      return merged;
-    }
-
-    @Override
-    public Double extractOutput(Accum accum) {
-      return ((double) accum.sum) / accum.count;
-    }
-  }
-
-  @VisibleForTesting
-  static double roundAverageFare(double avg) {
-    return Math.round(avg * 100) / 100d;
-  }
-
-  /**
-   * Creates BigQuery's TableRow object for inserting into the table processed_trips.
-   */
-  private static class TripToProcessedTripTableRowConverter
-          implements SerializableFunction<Trip, TableRow> {
-
-    private static final String NOW = Instant.now().toString();
-
-    @Override
-    public TableRow apply(Trip trip) {
-      return new TableRow()
-            .set(DST_KEY_COLUMN, trip.getUniqueKey())
-            .set(DST_TIMESTAMP_COLUMN, NOW);
-    }
-  }
-
-  /**
-   * Converts a grouped data object into a CSV line.
+   * Converts BigQuery's TableRow object into a CSV row.
    */
   @VisibleForTesting
-  @AllArgsConstructor
-  static class KvToCsvConverter extends SimpleFunction<KV<String, CoGbkResult>, String> {
-    final TupleTag<Trip> tripsTag;
-    final TupleTag<Long> countsTag;
-    final TupleTag<Double> averagesTag;
-
-    private static final DateTimeFormatter amPmFormatter = DateTimeFormatter.ofPattern("a");
-    private static final DateTimeFormatter hourOfDayFormatter = DateTimeFormatter.ofPattern("h");
-
+  static class TableRowToCsv implements SerializableFunction<SchemaAndRecord, String> {
     @Override
-    public String apply(KV<String, CoGbkResult> e) {
-      CoGbkResult result = e.getValue();
-      long numberOfTrips = result.getOnly(countsTag);
-      double averageFare = result.getOnly(averagesTag);
-      Trip sampleTrip = result.getAll(tripsTag).iterator().next();
-
-      return String.format("%s,%s,%s,%s,%s,%s,%s,%s",
-                          sampleTrip.getPickupArea(),
-                          sampleTrip.getTripStartHour().getDayOfWeek().getValue(),
-                          sampleTrip.isUsHoliday(),
-                          sampleTrip.getTripStartHour().getMonthValue(),
-                          Integer.valueOf(sampleTrip.getTripStartHour().format(hourOfDayFormatter)),
-                          sampleTrip.getTripStartHour().format(amPmFormatter),
-                          averageFare,
-                          numberOfTrips);
-    }
-  }
-
-  /**
-   * Converts BigQuery's TableRow object into a Trip object.
-   */
-  @VisibleForTesting
-  static class TableRowToTripConverter implements SerializableFunction<SchemaAndRecord, Trip> {
-    @Override
-    public Trip apply(SchemaAndRecord schemaAndRecord) {
+    public String apply(SchemaAndRecord schemaAndRecord) {
       GenericRecord r = schemaAndRecord.getRecord();
-      Trip trip = new Trip(String.valueOf(r.get("unique_key")));
-      trip.setTripStartHour(LocalDateTime.parse(String.valueOf(r.get("trip_start_hour"))));
-      trip.setPickupArea(Integer.valueOf(String.valueOf(r.get("pickup_community_area"))));
-      trip.setPickupLatitude(Double.valueOf(String.valueOf(r.get("pickup_latitude"))));
-      trip.setPickupLongitude(Double.valueOf(String.valueOf(r.get("pickup_longitude"))));
-      trip.setFare(Float.valueOf(String.valueOf(r.get("fare"))));
-      trip.setUsHoliday(Boolean.valueOf(String.valueOf(r.get("is_us_holiday"))));
-      return trip;
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < HEADERS.length; i++) {
+        sb.append(r.get(HEADERS[i]));
+        if (i < HEADERS.length - 1) {
+          sb.append(",");
+        }
+      }
+      return sb.toString();
     }
-  }
-
-  /**
-   * Creates a grouping key by the pickup area and pickup hour.
-   */
-  @VisibleForTesting
-  static String makeAreaHourGroupingKey(Trip trip) {
-    return String.format("%d_%s", trip.getPickupArea(), trip.getTripStartHour().toString());
   }
 
   /**
@@ -277,50 +113,135 @@ public class TripsPublicBqToStorage {
     ValueProvider<String> getSourceTable();
 
     void setSourceTable(ValueProvider<String> sourceTable);
-
-
-    @Description("A date from which the trips should be fetched from the source table.")
-    @Default.String("2018-08-01")
-    ValueProvider<String> getFromDate();
-
-    void setFromDate(ValueProvider<String> date);
-
-
-    @Description("Query limit.")
-    @Default.Integer(2000000000)
-    ValueProvider<Integer> getLimit();
-
-    void setLimit(ValueProvider<Integer> limit);
   }
 
   private static String makeQuery(Options options) {
+    return makeQuery(options.getDataset().get(), options.getSourceTable().get());
+  }
+
+  private static String makeQuery(String dataset, String sourceTable) {
     return String.format(
-            "SELECT t.unique_key, "
-            + " DATETIME(TIMESTAMP_TRUNC(t.trip_start_timestamp, HOUR)) AS trip_start_hour, "
-            + " t.pickup_latitude, "
-            + " t.pickup_longitude, "
-            + " t.pickup_community_area, "
-            + " IF (h.countryRegionCode IS NULL, false, true) AS is_us_holiday, "
-            + " t.fare "
-            + " FROM `%1$s.%4$s` t "
-            + " LEFT JOIN `%1$s.national_holidays` h "
-            + "     ON TIMESTAMP_TRUNC(t.trip_start_timestamp, DAY) = TIMESTAMP_TRUNC(h.date, DAY) "
-            + "     AND h.countryRegionCode = 'US' "
-            + " WHERE trip_start_timestamp >= TIMESTAMP(\"%2$s 00:00:00+00\") "
-            + " AND t.trip_start_timestamp IS NOT NULL "
-            + " AND t.trip_end_timestamp IS NOT NULL "
-            + " AND t.pickup_community_area IS NOT NULL "
-            + " AND t.fare IS NOT NULL "
-            + " AND t.trip_start_timestamp < t.trip_end_timestamp "
-            + " AND t.unique_key NOT IN "
-            + "     (SELECT unique_key FROM `%1$s.processed_trips`) "
-            + " AND (SELECT "
-            + "       ST_COVERS(b.boundaries, ST_GEOGPOINT(t.pickup_longitude, t.pickup_latitude)) "
-            + "       FROM `%1$s.chicago_boundaries` b) = True "
-            + " LIMIT %3$d",
-    StringEscapeUtils.escapeSql(options.getDataset().get()),
-    options.getFromDate().get(),
-    options.getLimit().get(),
-    StringEscapeUtils.escapeSql(options.getSourceTable().get()));
+        // temp function returns number of days in a corresponding month for a given date
+        "CREATE TEMP FUNCTION n_days_in_month(udate TIMESTAMP) AS ( "
+            + "  32 - EXTRACT(DAY FROM TIMESTAMP_ADD(TIMESTAMP_TRUNC(udate, MONTH), INTERVAL 31 DAY)) "
+            + "); "
+            + ""
+            + "WITH tmp_taxi_aggregate AS ( "
+            + "  SELECT "
+            + "    pickup_community_area AS area, "
+            + "    TIMESTAMP_TRUNC(trip_start_timestamp, HOUR) AS trip_datehour, "
+            + "    EXTRACT(DAYOFWEEK FROM trip_start_timestamp) - 1 AS day_of_week, "
+            + "    COUNT(*) AS n_trips "
+            + "  FROM `%1$s.%2$s` "
+            + "  WHERE "
+            + "    unique_key IN (SELECT unique_key "
+            + "                   FROM `%1$s.processed_trips` WHERE processed_timestamp IS NULL) "
+            + "  GROUP BY "
+            + "    area, trip_datehour, day_of_week "
+            + "  ), "
+            + ""
+            + "  tmp_taxi_aggregate_extracted AS ( "
+            + "    SELECT  "
+            + "        area, "
+            + "        n_trips, "
+            + "        trip_datehour, "
+            + "        day_of_week, "
+            + "        EXTRACT(HOUR FROM trip_datehour) AS hour, "
+            + "        EXTRACT(DAY FROM trip_datehour) AS day, "
+            + "        EXTRACT(WEEK(MONDAY) FROM trip_datehour) AS week, "
+            + "        EXTRACT(MONTH FROM trip_datehour) AS month, "
+            + "        EXTRACT(QUARTER FROM trip_datehour) AS quarter, "
+            + "        n_days_in_month(trip_datehour) AS n_days_in_month "
+            + "    FROM tmp_taxi_aggregate"
+            + "    WHERE MOD(ABS(FARM_FINGERPRINT(CAST(DATE(trip_datehour) AS STRING))), 10) < 8), "
+            + ""
+            + "  tmp_taxi_aggregate_scaled AS ( "
+            + "    SELECT "
+            + "      area, "
+            + "      n_trips, "
+            + "      n_trips + (RAND() - .5) * POWER(2, -16) AS n_trips_num, "
+            + "      trip_datehour,  "
+            + "      hour, "
+            + "      hour / 24 AS hour_num, "
+            + "      day, "
+            + "      (day - 1) / n_days_in_month AS day_num, "
+            + "      week, "
+            + "      week / 53 AS week_num, "
+            + "      month, "
+            + "      (month - 1) / 12 AS month_num, "
+            + "      quarter, "
+            + "      (quarter - 1) / 4 AS quarter_num, "
+            + "      day_of_week, "
+            + "      (day_of_week - 1) / 7 AS day_of_week_num, "
+            + "      (day_of_week - 1 + hour / 24 ) / 7 AS weekday_hour_num, "
+            + "      ( "
+            + "        month-1 + (day - 1 + hour / 24) / n_days_in_month "
+            + "      ) / 12 AS yearday_hour_num "
+            + "    FROM tmp_taxi_aggregate_extracted "
+            + "  ), "
+            + ""
+            + "  tmp_taxi_result AS ( "
+            + "    SELECT "
+            + "      area,  "
+            + "      EXTRACT(YEAR FROM trip_datehour) AS year,  "
+            + "      quarter,  "
+            + "      quarter_num, "
+            + "      COS(quarter_num * 2*ACOS(-1)) AS quarter_cos, "
+            + "      SIN(quarter_num * 2*ACOS(-1)) AS quarter_sin, "
+            + "      month,  "
+            + "      month_num, "
+            + "      COS(month_num * 2*ACOS(-1)) AS month_cos, "
+            + "      SIN(month_num * 2*ACOS(-1)) AS month_sin, "
+            + "      day,  "
+            + "      day_num,  "
+            + "      COS(day_num * 2*ACOS(-1)) AS day_cos, "
+            + "      SIN(day_num * 2*ACOS(-1)) AS day_sin, "
+            + "      hour, "
+            + "      hour_num, "
+            + "      COS(hour_num * 2*ACOS(-1)) AS hour_cos, "
+            + "      SIN(hour_num * 2*ACOS(-1)) AS hour_sin, "
+            + "      IF (hour < 12, 'am', 'pm') AS day_period, "
+            + "      week,  "
+            + "      week_num, "
+            + "      COS(week_num * 2*ACOS(-1)) AS week_cos, "
+            + "      SIN(week_num * 2*ACOS(-1)) AS week_sin, "
+            + "      day_of_week, "
+            + "      day_of_week_num, "
+            + "      COS(day_of_week_num * 2*ACOS(-1)) AS day_of_week_cos, "
+            + "      SIN(day_of_week_num * 2*ACOS(-1)) AS day_of_week_sin, "
+            + "      weekday_hour_num, "
+            + "      COS(weekday_hour_num * 2*ACOS(-1)) AS weekday_hour_cos, "
+            + "      SIN(weekday_hour_num * 2*ACOS(-1)) AS weekday_hour_sin, "
+            + "      yearday_hour_num, "
+            + "      COS(yearday_hour_num * 2*ACOS(-1)) AS yearday_hour_cos, "
+            + "      SIN(yearday_hour_num * 2*ACOS(-1)) AS yearday_hour_sin, "
+            + "      day_of_week IN (6, 7) AS is_weekend, "
+            + "      IF (h.holidayName IS NULL, False, True) AS is_holiday, "
+            + "      n_trips, "
+            + "      n_trips_num, "
+            + "      LOG(n_trips_num + 1) AS log_n_trips, "
+            + "      CASE  "
+            + "        WHEN n_trips < 10 THEN 1  " // 'bucket_[0-10)'
+            + "        WHEN n_trips >= 10 AND n_trips < 15 THEN 2 " // 'bucket_[10-15)'
+            + "        WHEN n_trips >= 15 AND n_trips < 20 THEN 3 " // 'bucket_[15-20)'
+            + "        WHEN n_trips >= 20 AND n_trips < 30 THEN 5 " // 'bucket_[20-30)'
+            + "        WHEN n_trips >= 30 AND n_trips < 50 THEN 7 " // 'bucket_[30-50)'
+            + "        WHEN n_trips >= 50 THEN 10 " // 'bucket_[100-)'
+            + "      END AS trips_bucket "
+            + "    FROM  "
+            + "      tmp_taxi_aggregate_scaled t "
+            + "    LEFT JOIN `%1$s.national_holidays` h "
+            + "    ON TIMESTAMP_TRUNC(t.trip_datehour, DAY) = h.date) "
+            + ""
+            + "SELECT "
+            + "  *, "
+            + "  trips_bucket + (RAND() - .5) * POWER(2, -16) AS trips_bucket_num "
+            + "FROM tmp_taxi_result "
+            + "WHERE trips_bucket <> 1 "
+            + "OR RAND() < ("
+            + "    SELECT COUNTIF(trips_bucket != 1) / COUNTIF(trips_bucket = 1) / (COUNT(DISTINCT trips_bucket) - 1)"
+            + "    FROM tmp_taxi_result"
+            + "  )",
+        StringEscapeUtils.escapeSql(dataset), StringEscapeUtils.escapeSql(sourceTable));
   }
 }

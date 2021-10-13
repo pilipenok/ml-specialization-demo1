@@ -29,16 +29,13 @@ from tensorflow.keras.metrics import \
     MeanSquaredError, MeanAbsolutePercentageError
 from tensorflow.keras.regularizers import l1_l2
 
-# from pipeline import components
 
 # constants
 BASELINE = True  # False #
-TASK = 'regr'  # 'class' #
 
 REGULARIZE = False  # True #
 DROPOUT = False  # True #
 
-NUM_CLASSES = 11
 EPOCHS = 25
 TRAIN_BATCH_SIZE = 16
 TRAIN_NUM_STEPS = 50000
@@ -46,10 +43,9 @@ EVAL_BATCH_SIZE = 16
 EVAL_NUM_STEPS = 1000
 ES_PATIENCE = 0 if BASELINE else 3
 
-LABEL_KEY = 'trips_bucket' # if TASK == 'class' else 'trips_bucket_num'  # 'n_trips'  # 'log_n_trips' #
+LABEL_KEY = 'trips_bucket_num'
 
-MODEL_NAME = f"{LABEL_KEY}-" \
-             f"{'baseline' if BASELINE else 'advanced'}" \
+MODEL_NAME = f"{'baseline' if BASELINE else 'advanced'}" \
              f"{'_regul' if REGULARIZE and not BASELINE else ''}" \
              f"{'_drop' if DROPOUT and not BASELINE else ''}" \
              f"-{EPOCHS}-{TRAIN_BATCH_SIZE}"
@@ -57,13 +53,13 @@ MODEL_NAME = f"{LABEL_KEY}-" \
 LEARNING_RATE = 0.001
 
 HIDDEN_UNITS_BASE_DEEP = [32, 16, 8]
-HIDDEN_UNITS_BASE_CONCAT = [32, NUM_CLASSES if TASK == 'class' else 1]
+HIDDEN_UNITS_BASE_CONCAT = [32, 1]
 
 HIDDEN_UNITS_ADV_DEEP = [64, 32, 16]
 HIDDEN_UNITS_ADV_EMBED = [8]
 HIDDEN_UNITS_ADV_MIX = [16, 4]
 HIDDEN_UNITS_ADV_WIDE = [512, 64, 4]
-HIDDEN_UNITS_ADV_CONCAT = [4, NUM_CLASSES if TASK == 'class' else 1]
+HIDDEN_UNITS_ADV_CONCAT = [4, 1]
 
 # features
 FEATURE_KEYS = \
@@ -146,8 +142,7 @@ FEATURE_SPEC = {
         for feature in CATEGORICAL_FEATURE_KEYS
     },
     LABEL_KEY: tf.io.FixedLenFeature(
-        shape=[1 if '_num' in LABEL_KEY else NUM_CLASSES],
-        dtype=tf.float32 if '_num' in LABEL_KEY else tf.int64
+        shape=[1], dtype=tf.float32 if '_num' in LABEL_KEY else tf.int64
     ),
     'year': tf.io.FixedLenFeature(shape=[1], dtype=tf.int64),
 }
@@ -366,21 +361,11 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     mirrored_strategy = tf.distribute.MirroredStrategy()
     with mirrored_strategy.scope():
-        if TASK == 'class':
-            loss = loss_sce(from_logits=True)
-            metrics = [
-                Accuracy(),
-                AUC(curve='ROC', name='ROC'),
-                AUC(curve='PR', name='PR'),
-                SparseCategoricalAccuracy(),
-                SparseCategoricalCrossentropy(from_logits=True)
-            ]
-        elif TASK == 'regr':
-            loss = loss_mse() if BASELINE else loss_mape()
-            metrics = [
-                MeanSquaredError(),
-                MeanAbsolutePercentageError(),
-            ]
+        loss = loss_mse() if BASELINE else loss_mape()
+        metrics = [
+            MeanSquaredError(),
+            MeanAbsolutePercentageError(),
+        ]
 
         model = _build_keras_model()
         model.compile(

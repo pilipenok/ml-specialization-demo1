@@ -17,18 +17,15 @@
 This file defines environments for a TFX taxi pipeline.
 """
 
-import os
 import tfx
 
-PIPELINE_NAME = 'tfx-pipeline-ml-demo1-chicago-taxi'
+PIPELINE_NAME = 'tfx-pipeline-demo1-taxi'
 GOOGLE_CLOUD_PROJECT = 'or2--epm-gcp-by-meetup2-t1iylu'
 GCS_BUCKET_NAME = 'epm-spec-chicago-taxi'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
-# Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example. 
-
-DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips'
-LOCAL_DATA_PATH = '.'  # local path to 'trips_small.csv'
+# Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example.
+DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips_bucket/'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -38,13 +35,9 @@ PIPELINE_IMAGE = f'gcr.io/{GOOGLE_CLOUD_PROJECT}/{PIPELINE_NAME}'
 PREPROCESSING_FN = 'models.preprocessing.preprocessing_fn'
 RUN_FN = 'models.keras.baseline_advanced.model.run_fn'
 MODULE_FILE = f'gs://{GCS_BUCKET_NAME}/model.py'
-SERVING_MODEL_DIR = f'gs://{GCS_BUCKET_NAME}/serving_model'
 
-TRAIN_NUM_STEPS = 100
-EVAL_NUM_STEPS = 10
-# EVAL_ACCURACY_THRESHOLD = 0.6
-# TRAIN_BATCH_SIZE = 16
-# EVAL_BATCH_SIZE = 16
+TRAIN_NUM_STEPS = 10000
+EVAL_NUM_STEPS = 1000
 
 USE_GPU = False
 # A dict which contains the training job parameters to be passed to Google
@@ -91,17 +84,13 @@ GCP_AI_PLATFORM_SERVING_ARGS = {
 # TFX pipeline produces many output files and metadata. All output data will be
 # stored under this OUTPUT_DIR.
 OUTPUT_DIR = f'gs://{GCS_BUCKET_NAME}'
-LOCAL_OUTPUT_DIR = './'
 
 # TFX produces two types of outputs, files and metadata.
 # - Files will be created under PIPELINE_ROOT directory.
 PIPELINE_ROOT = f'{OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
-LOCAL_PIPELINE_ROOT = f'{LOCAL_OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
 
-# The last component of the pipeline, "Pusher" will produce serving model under
-# SERVING_MODEL_DIR.
+# The last component of the pipeline, "Pusher" will produce serving model under SERVING_MODEL_DIR.
 SERVING_MODEL_DIR = f'{PIPELINE_ROOT}/serving_model'
-LOCAL_SERVING_MODEL_DIR = f'{LOCAL_PIPELINE_ROOT}/serving_model'
 
 # NEW: Configuration for Vertex AI Training.
 # This dictionary will be passed as `CustomJobSpec`.

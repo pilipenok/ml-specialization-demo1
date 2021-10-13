@@ -3,9 +3,8 @@
 These values can be tweaked to affect model training performance.
 """
 
-
-baseline = True # False #
-task = 'regr' # 'class' #
+baseline = True # False # 
+task = 'regr' # 'class' # 
 
 regularizer = False # True #
 dropout = False # True #

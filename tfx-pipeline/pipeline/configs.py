@@ -111,7 +111,7 @@ GCP_VERTEX_AI_TRAINING_ARGS = {
         'machine_spec': {'machine_type': 'n1-standard-4', },
         'replica_count': 1,
         'container_spec': {
-            'image_uri': 'gcr.io/tfx-oss-public/tfx:{}'.format(tfx.__version__),
+            'image_uri': 'gcr.io/tfx-oss-public/tfx:1.3.1'
         },
     }],
 }

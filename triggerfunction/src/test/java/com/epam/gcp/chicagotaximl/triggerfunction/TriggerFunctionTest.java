@@ -57,11 +57,13 @@ public class TriggerFunctionTest {
     TemplatesServiceClient dataflowMock = ctx.getBean(TemplatesServiceClient.class);
 
     when(bigQueryDaoMock.verifyPreprocessedState()).thenReturn(true);
+    when(bigQueryDaoMock.verifyMlDatasetState()).thenReturn(true);
     when(bigQueryDaoMock.checkLastModifiedTime()).thenReturn(false);
 
     triggerFunction.run();
 
     verify(bigQueryDaoMock).verifyPreprocessedState();
+    verify(bigQueryDaoMock).verifyMlDatasetState();
     verify(bigQueryDaoMock).checkLastModifiedTime();
 
     verifyNoMoreInteractions(bigQueryDaoMock);
@@ -77,11 +79,13 @@ public class TriggerFunctionTest {
     TemplatesServiceClient dataflowMock = ctx.getBean(TemplatesServiceClient.class);
 
     when(bigQueryDaoMock.verifyPreprocessedState()).thenReturn(true);
+    when(bigQueryDaoMock.verifyMlDatasetState()).thenReturn(true);
     when(bigQueryDaoMock.checkLastModifiedTime()).thenReturn(true);
 
     triggerFunction.run();
 
     verify(bigQueryDaoMock).verifyPreprocessedState();
+    verify(bigQueryDaoMock).verifyMlDatasetState();
     verify(bigQueryDaoMock).checkLastModifiedTime();
     verify(bigQueryDaoMock).prepareTripsForDataflow();
     verify(dataflowMock).createJobFromTemplate(any());

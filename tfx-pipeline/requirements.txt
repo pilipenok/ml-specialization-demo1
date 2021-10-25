@@ -1,5 +1,5 @@
-tfx==1.2.0
-kfp
-google-cloud-aiplatform
-keras_tuner
-tensorflow_recommenders
+tfx==1.3.0
+tensorflow==2.6.0
+kfp==1.8.1
+google-cloud-aiplatform==0.7.1
+keras_tuner==1.0.4

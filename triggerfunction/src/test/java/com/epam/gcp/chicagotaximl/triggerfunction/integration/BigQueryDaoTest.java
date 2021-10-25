@@ -148,11 +148,31 @@ public class BigQueryDaoTest {
     assertThat(bigQueryDao.verifyPreprocessedState()).isFalse();
   }
 
+  @Test
+  void testNewModificationTimestampQuery() throws Exception {
+    bigQueryTesting.insertPublicDatasetTables(List.of(
+        List.of("some_table", String.valueOf(
+            Timestamp.parseTimestamp("2021-10-01T10:15:30.000Z").getSeconds() * 1000)),
+        List.of("taxi_trips", String.valueOf(
+            Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000))));
+
+    String query = String.format(BigQueryDao.NEW_MODIFICATION_TIMESTAMP_QUERY,
+        bigQueryTesting.getDataset());
+    bigQueryTesting.query(query);
+
+    List<FieldValueList> modificationTimestamps = bigQueryTesting.query(
+        String.format("SELECT * FROM `%s.%s`", bigQueryTesting.getDataset(),
+            BigQueryTesting.SOURCE_MODIFICATION_TABLE));
+    assertThat(modificationTimestamps).hasSize(1);
+    assertThat(modificationTimestamps.get(0).get("modification_timestamp").getTimestampValue())
+        .isEqualTo(Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000000);
+  }
+
   /**
    * First run. Tables 'processed_trips' and 'source_modification_timestamps' are empty.
    */
   @Test
-  void testPrepareTripsForDataflow_firstRun() throws Exception {
+  void testNewTripsQuery_firstRun() throws Exception {
     bigQueryTesting.insertTaxiTrips(List.of(
         List.of("3", "taxi_id",
             Timestamp.parseTimestamp("2021-05-01T20:10:05.000Z").toString(),
@@ -170,13 +190,9 @@ public class BigQueryDaoTest {
             "41.968069", "-87.721559063", "41.968069", "-87.721559063"))
     );
 
-    bigQueryTesting.insertPublicDatasetTables(List.of(
-        List.of("some_table", String.valueOf(
-            Timestamp.parseTimestamp("2021-10-01T10:15:30.000Z").getSeconds() * 1000)),
-        List.of("taxi_trips", String.valueOf(
-            Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000))));
-
-    bigQueryDao.prepareTripsForDataflow();
+    String query = String.format(BigQueryDao.NEW_TRIPS_QUERY,
+        bigQueryTesting.getDataset(), "taxi_trips", "2020-04-01");
+    bigQueryTesting.query(query);
 
     // Expected new records in table 'processed_trips'
 
@@ -186,25 +202,10 @@ public class BigQueryDaoTest {
     assertThat(processedTrips).hasSize(2);
     assertThat(processedTrips.get(0).get("unique_key").getStringValue()).isEqualTo("3");
     assertThat(processedTrips.get(1).get("unique_key").getStringValue()).isEqualTo("4");
-
-    // Expected new record in table 'source_modification_timestamps'.
-
-    List<FieldValueList> modificationTimestamps = bigQueryTesting.query(
-        String.format("SELECT * FROM `%s.%s`", bigQueryTesting.getDataset(),
-            BigQueryTesting.SOURCE_MODIFICATION_TABLE));
-    assertThat(modificationTimestamps).hasSize(1);
-    assertThat(modificationTimestamps.get(0).get("modification_timestamp").getTimestampValue())
-        .isEqualTo(Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000000);
   }
 
   @Test
-  void testPrepareTripsForDataflow() throws Exception {
-    bigQueryTesting.insertPublicDatasetTables(List.of(
-        List.of("some_table", String.valueOf(
-            Timestamp.parseTimestamp("2021-10-01T10:15:30.000Z").getSeconds() * 1000)),
-        List.of("taxi_trips", String.valueOf(
-            Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000))));
-
+  void testNewTripsQuery() throws Exception {
     // Trips have different IDs only
     bigQueryTesting.insertTaxiTrips(List.of(
         List.of("1", "taxi_id",
@@ -237,15 +238,13 @@ public class BigQueryDaoTest {
             "41.968069", "-87.721559063", "41.968069", "-87.721559063"))
     );
 
-    bigQueryTesting.insertSourceModificationTimestamps(List.of(
-        List.of(Timestamp.parseTimestamp("2021-08-08T10:15:30.000Z").toString()),
-        List.of(Timestamp.parseTimestamp("2021-08-09T10:15:30.000Z").toString())));
-
     bigQueryTesting.insertProcessedTrips(List.of(
         List.of("1", Timestamp.parseTimestamp("2021-08-09T11:00:00.000Z").toString()),
         List.of("2", Timestamp.parseTimestamp("2021-08-09T11:00:00.000Z").toString())));
 
-    bigQueryDao.prepareTripsForDataflow();
+    String query = String.format(BigQueryDao.NEW_TRIPS_QUERY,
+        bigQueryTesting.getDataset(), "taxi_trips", "2020-04-01");
+    bigQueryTesting.query(query);
 
     // Table 'processed_trips' has already had 2 records, expecting 2 more records to appear
 
@@ -268,24 +267,10 @@ public class BigQueryDaoTest {
     assertThat(processedTrip3.get("processed_timestamp").isNull()).isTrue();
     assertThat(processedTrip4.get("unique_key").getStringValue()).isEqualTo("4");
     assertThat(processedTrip4.get("processed_timestamp").isNull()).isTrue();
-
-    // Table 'source_modification_timestamps' has already had 2 records, expecting 1 new record
-    // to appear
-
-    List<FieldValueList> modificationTimestamps = bigQueryTesting.query(
-        String.format("SELECT * FROM `%s.%s` ORDER BY modification_timestamp",
-            bigQueryTesting.getDataset(), BigQueryTesting.SOURCE_MODIFICATION_TABLE));
-    assertThat(modificationTimestamps).hasSize(3);
-    assertThat(modificationTimestamps.get(0).get("modification_timestamp").getTimestampValue())
-        .isEqualTo(Timestamp.parseTimestamp("2021-08-08T10:15:30.000Z").getSeconds() * 1000000);
-    assertThat(modificationTimestamps.get(1).get("modification_timestamp").getTimestampValue())
-        .isEqualTo(Timestamp.parseTimestamp("2021-08-09T10:15:30.000Z").getSeconds() * 1000000);
-    assertThat(modificationTimestamps.get(2).get("modification_timestamp").getTimestampValue())
-        .isEqualTo(Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000000);
   }
 
   @Test
-  void testPrepareTripsForDataflow_invalidLocation() throws Exception {
+  void testPrepareTripsForDataflow_invalidGeoPoints() throws Exception {
     bigQueryTesting.insertTaxiTrips(List.of(
         List.of("3", "taxi_id",
             Timestamp.parseTimestamp("2021-05-01T20:10:05.000Z").toString(),
@@ -296,11 +281,9 @@ public class BigQueryDaoTest {
             "1", "1", "41.968069", "-87.721559063"))
     );
 
-    bigQueryTesting.insertPublicDatasetTables(List.of(
-        List.of("taxi_trips", String.valueOf(
-            Timestamp.parseTimestamp("2021-08-10T10:15:30.000Z").getSeconds() * 1000))));
-
-    bigQueryDao.prepareTripsForDataflow();
+    String query = String.format(BigQueryDao.NEW_TRIPS_QUERY,
+        bigQueryTesting.getDataset(), "taxi_trips", "2020-04-01");
+    bigQueryTesting.query(query);
 
     // Expected no new records added in table 'processed_trips'
 

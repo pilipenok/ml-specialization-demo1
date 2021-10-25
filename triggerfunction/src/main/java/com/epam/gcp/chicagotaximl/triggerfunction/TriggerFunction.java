@@ -72,6 +72,11 @@ public class TriggerFunction {
         return;
       }
 
+      if (!bigQueryDao.verifyMlDatasetState()) {
+        logger.severe("Dataset table state check failed.");
+        return;
+      }
+
       logger.info("Checking last_modified_time.");
       if (!bigQueryDao.checkLastModifiedTime()) {
         return;

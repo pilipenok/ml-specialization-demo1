@@ -50,16 +50,11 @@ public class CleanupFunctionTest {
 
   @Test
   void testAccept_success() throws Exception {
-    TableResult result = mock(TableResult.class);
-    when(result.getTotalRows()).thenReturn((long) 25);
-    when(bigQueryMock.query(any())).thenReturn(result);
-
     GcsEvent event = new GcsEvent();
     event.setName("trips/trips.csv");
     cleanupFunction.accept(event, null);
 
     verify(bigQueryMock).query(any());
-    verify(loggerMock).info("25 rows marked as processed.");
   }
 
   /**

@@ -33,10 +33,13 @@ public class CleanupFunction implements BackgroundFunction<GcsEvent> {
   @Autowired
   private Logger logger;
 
-  private static final String QUERY =
+  private static final String MARK_PROCESSED_TRIPS_QUERY =
       "UPDATE `%1$s.processed_trips` "
           + "SET processed_timestamp = CURRENT_TIMESTAMP() "
-          + "WHERE processed_timestamp IS NULL";
+          + "WHERE processed_timestamp IS NULL; ";
+
+  private static final String TRUNCATE_ML_DATASET_QUERY =
+      "TRUNCATE TABLE `%1$s.ml_dataset`; ";
 
   public CleanupFunction(String dataset, String filename) {
     this.dataset = dataset;
@@ -49,9 +52,12 @@ public class CleanupFunction implements BackgroundFunction<GcsEvent> {
       logger.info(String.format("Ignored event on '%s'.", event.getName()));
       return;
     }
+
     Builder queryBuilder = QueryJobConfiguration.newBuilder(
-        String.format(QUERY, StringEscapeUtils.escapeSql(dataset)));
-    TableResult result = bigquery.query(queryBuilder.build());
-    logger.info(String.format("%d rows marked as processed.", result.getTotalRows()));
+        String.format(MARK_PROCESSED_TRIPS_QUERY + TRUNCATE_ML_DATASET_QUERY,
+        StringEscapeUtils.escapeSql(dataset)));
+    bigquery.query(queryBuilder.build());
+
+    logger.info("New rows marked as processed.");
   }
 }

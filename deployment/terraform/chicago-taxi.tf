@@ -263,6 +263,217 @@ resource "google_bigquery_table" "PublicDatasetTables" {
   }
 }
 
+resource "google_bigquery_table" "MlDataset" {
+  dataset_id          = google_bigquery_dataset.ChicagoTaxi.dataset_id
+  table_id            = "ml_dataset"
+  deletion_protection = false
+  // The table is going to be recreated with proper fields by Trigger Function
+  schema              = <<EOF
+[
+  {
+    "mode": "NULLABLE",
+    "name": "area",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "year",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "quarter",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "quarter_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "quarter_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "quarter_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "month_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "hour",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "hour_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "hour_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "hour_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_period",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "week",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "week_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "week_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "week_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_of_week",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_of_week_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_of_week_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "day_of_week_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "weekday_hour_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "weekday_hour_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "weekday_hour_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "yearday_hour_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "yearday_hour_cos",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "yearday_hour_sin",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "is_weekend",
+    "type": "BOOLEAN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "is_holiday",
+    "type": "BOOLEAN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "n_trips",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "n_trips_num",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "log_n_trips",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "trips_bucket",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "trips_bucket_num",
+    "type": "FLOAT"
+  }
+]
+EOF
+}
+
 # Common IAM Roles
 
 resource "google_project_iam_custom_role" "BigQueryWriter" {
@@ -383,6 +594,20 @@ resource "google_bigquery_table_iam_member" "TriggerFunction_ChicagoBoundariesRa
   member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
 }
 
+resource "google_bigquery_table_iam_member" "TriggerFunction_NationalHolidaysReader" {
+  dataset_id = google_bigquery_table.NationalHolidays.dataset_id
+  table_id   = google_bigquery_table.NationalHolidays.id
+  role       = google_project_iam_custom_role.BigQueryReader.id
+  member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
+}
+
+resource "google_bigquery_table_iam_member" "TriggerFunction_MlDatasetWriter" {
+  dataset_id = google_bigquery_table.MlDataset.dataset_id
+  table_id   = google_bigquery_table.MlDataset.id
+  role       = google_project_iam_custom_role.BigQueryWriter.id
+  member     = "serviceAccount:${google_service_account.TriggerFunction.email}"
+}
+
 resource "google_storage_bucket_iam_member" "TriggerFunction_SystemStorageReader" {
   bucket = google_storage_bucket.DataflowSystemFiles.id
   role   = "roles/storage.objectViewer"
@@ -419,23 +644,9 @@ resource "google_project_iam_member" "TripsDataflow" {
   member = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
 
-resource "google_bigquery_table_iam_member" "TripsDataflow_TaxiTripsViewReader" {
-  dataset_id = google_bigquery_table.TaxiTripsView.dataset_id
-  table_id   = google_bigquery_table.TaxiTripsView.id
-  role       = google_project_iam_custom_role.BigQueryReader.id
-  member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
-}
-
-resource "google_bigquery_table_iam_member" "TripsDataflow_NationalHolidaysReader" {
-  dataset_id = google_bigquery_table.NationalHolidays.dataset_id
-  table_id   = google_bigquery_table.NationalHolidays.id
-  role       = google_project_iam_custom_role.BigQueryReader.id
-  member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
-}
-
-resource "google_bigquery_table_iam_member" "TripsDataflow_ProcessedTripsReader" {
-  dataset_id = google_bigquery_table.ProcessedTrips.dataset_id
-  table_id   = google_bigquery_table.ProcessedTrips.id
+resource "google_bigquery_table_iam_member" "TripsDataflow_MlDatasetReader" {
+  dataset_id = google_bigquery_table.MlDataset.dataset_id
+  table_id   = google_bigquery_table.MlDataset.id
   role       = google_project_iam_custom_role.BigQueryReader.id
   member     = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
@@ -481,6 +692,13 @@ resource "google_project_iam_member" "CleanupFunction" {
 resource "google_bigquery_table_iam_member" "CleanupFunction_ProcessedTripsWriter" {
   dataset_id = google_bigquery_table.ProcessedTrips.dataset_id
   table_id   = google_bigquery_table.ProcessedTrips.id
+  role       = google_project_iam_custom_role.BigQueryWriter.id
+  member     = "serviceAccount:${google_service_account.CleanupFunction.email}"
+}
+
+resource "google_bigquery_table_iam_member" "CleanupFunction_MlDatasetWriter" {
+  dataset_id = google_bigquery_table.MlDataset.dataset_id
+  table_id   = google_bigquery_table.MlDataset.id
   role       = google_project_iam_custom_role.BigQueryWriter.id
   member     = "serviceAccount:${google_service_account.CleanupFunction.email}"
 }

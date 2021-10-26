@@ -63,6 +63,12 @@ GCP_AI_PLATFORM_TRAINING_ARGS = {
 GCP_AI_PLATFORM_SERVING_ARGS = {
     'model_name': PIPELINE_NAME.replace('-', '_'),  # '-' is not allowed.
     'project_id': GOOGLE_CLOUD_PROJECT,
+    'machine_type': "mls1-c1-m2",
+}
+
+GCP_VERTEX_SERVING_ARGS = {
+    # 'model_name': PIPELINE_NAME.replace('-', '_') + "_test131",  # '-' is not allowed.
+    'project': GOOGLE_CLOUD_PROJECT,
     # The region to use when serving the model. See available regions here:
     # https://cloud.google.com/ml-engine/docs/regions
     # Note that serving currently only supports a single region:
@@ -71,7 +77,7 @@ GCP_AI_PLATFORM_SERVING_ARGS = {
     'endpoint_name': 'chicago_taxi_model_endoint',
     'min_replica_count': 1,
     'max_replica_count': 2,
-    'machine_type': 'n1-standard-2'
+    'machine_type': 'n1-standard-4'
 }
 # If you are looking for the url to query the Endpoint,
 # that's in a property pushed_destination of the pushed_model output artifact:

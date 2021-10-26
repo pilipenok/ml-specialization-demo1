@@ -24,7 +24,11 @@ steps:
     entrypoint: /bin/sh
     args:
       - -c
-      - 'cd ml-specialization-demo1/tfx-pipeline && pip install -r requirements.txt && python vertex_compile.py'
+      - |
+        cd ml-specialization-demo1/tfx-pipeline
+        pip install -r requirements.txt
+        python vertex_compile.py
+        python vertex_run.py
 availableSecrets:
   secretManager:
     - versionName: projects/877218744686/secrets/ssh-gitlab-secret/versions/1

@@ -74,7 +74,10 @@ def create_pipeline(
     model_blessing = _evaluator.outputs['blessing']
 
     pusher = pc.pusher_vertex if enable_vertex else pc.pusher
-    _pusher = pusher(model=model, model_blessing=model_blessing)
+    _pusher = pusher(
+        model=model,
+        # model_blessing=model_blessing
+    )
 
     components = [
         _example_gen,

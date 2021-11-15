@@ -1,6 +1,7 @@
 tfx==1.3.1
 tensorflow==2.6.0
 tensorflow-estimator==2.6.0
+keras~=2.6.0
 kfp==1.8.1
 google-cloud-aiplatform==0.7.1
 keras_tuner==1.0.4

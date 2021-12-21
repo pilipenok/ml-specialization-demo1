@@ -1,6 +1,7 @@
 from kfp.v2.google import client
 from pipeline import configs
 
+
 PIPELINE_NAME = configs.PIPELINE_NAME
 PIPELINE_DEFINITION_FILE = PIPELINE_NAME + '_pipeline.json'
 GS_PIPELINE_DEFINITION_URI = f'gs://{configs.GCS_BUCKET_NAME}/{PIPELINE_DEFINITION_FILE}'

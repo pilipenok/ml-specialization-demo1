@@ -29,17 +29,20 @@ import tensorflow_transform as tft
 # from pipeline import components
 
 
-FEATURE_KEYS = 'area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
-
+FEATURE_KEYS = ('area,is_holiday,day_of_week,year,month,day,hour24,hour12,day_period,avg_total_per_trip_prev4h_area,'
+                'avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city').split(
+    ',')
 
 LABEL_KEY = 'relative_demand'
-
 
 # Since we're not generating or creating a schema, we will instead create a feature spec.
 FEATURE_SPEC = {
     **{
         feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.float32)
-        for feature in 'avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,avg_ntrips_prev_4h_city'.split(',')
+        for feature in
+        'avg_total_per_trip_prev4h_area,avg_total_per_trip_prev4h_city,avg_ntrips_prev_4h_area,'
+        'avg_ntrips_prev_4h_city'.split(
+            ',')
     },
     **{
         feature: tf.io.FixedLenFeature(shape=[1], dtype=tf.int64)
@@ -53,6 +56,14 @@ FEATURE_SPEC = {
 
 def get_schema():
     return schema_utils.schema_from_feature_spec(FEATURE_SPEC)
-    #return components.schema_gen().outputs['schema']
+    # return components.schema_gen().outputs['schema']
 
 
+def transformed_name(key):
+    """Generate the name of the transformed feature from original name."""
+    return key + '_xf'
+
+
+def transformed_names(keys):
+    """Transform multiple feature names at once."""
+    return [transformed_name(key) for key in keys]

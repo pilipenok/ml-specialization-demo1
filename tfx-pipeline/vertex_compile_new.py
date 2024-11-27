@@ -1,4 +1,4 @@
-from tfx.orchestration.kubeflow.v2.kubeflow_v2_dag_runner import KubeflowV2DagRunnerConfig, KubeflowV2DagRunner
+from tfx.orchestration.vertex import vertex_dag_runner
 from google.cloud import storage
 
 from absl import logging
@@ -15,12 +15,14 @@ GS_MODEL_URI = configs.MODULE_FILE
 
 def main():
     print(f'Compiling to {PIPELINE_DEFINITION_FILE}')
-    runner_config = KubeflowV2DagRunnerConfig(
+    runner_config = vertex_dag_runner.VertexDagRunnerConfig(
+        project=configs.GCP_PROJECT_ID,
+        location=configs.GOOGLE_CLOUD_REGION,
         display_name='tfx-vertex-pipeline-{}'.format(PIPELINE_NAME),
-        default_image=f"gcr.io/tfx-oss-public/tfx:1.15.1"
+        default_image=f"gcr.io/tfx-oss-public/tfx:1.3.1"
     )
 
-    KubeflowV2DagRunner(
+    vertex_dag_runner.VertexDagRunner(
         config=runner_config,
         output_filename=PIPELINE_DEFINITION_FILE
     ).run(
@@ -34,7 +36,7 @@ def main():
     )
 
     print(f'Uploading pipeline to {GS_PIPELINE_DEFINITION_URI}')
-    client=storage.Client()
+    client = storage.Client()
     storage.Blob.from_string(GS_PIPELINE_DEFINITION_URI, client=client).upload_from_filename(PIPELINE_DEFINITION_FILE)
     print(f'Uploading model to {GS_MODEL_URI}')
     storage.Blob.from_string(GS_MODEL_URI, client=client).upload_from_filename(MODEL_PATH)

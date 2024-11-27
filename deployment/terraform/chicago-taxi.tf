@@ -59,7 +59,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "3.79.0"
+      version = "6.4.0"
     }
   }
 }
@@ -126,14 +126,14 @@ resource "google_storage_bucket_object" "NationalHolidays" {
 resource "google_storage_bucket_object" "TriggerFunctionSource" {
   name   = "triggerfunction.zip"
   source = var.trigger-function-location
-  bucket = google_storage_bucket.FunctionsSystemFiles.id
+  bucket = google_storage_bucket.FunctionsSystemFiles.name
 }
 
 // Source code of CleanupFunction
 resource "google_storage_bucket_object" "CleanupFunctionSource" {
   name   = "cleanupfunction.zip"
   source = var.cleanup-function-location
-  bucket = google_storage_bucket.FunctionsSystemFiles.id
+  bucket = google_storage_bucket.FunctionsSystemFiles.name
 }
 
 // Topic to execute TriggerFunction from Cloud Scheduler
@@ -548,6 +548,7 @@ resource "google_project_iam_custom_role" "TriggerFunction" {
 }
 
 resource "google_project_iam_member" "TriggerFunction" {
+  project = var.project
   role   = google_project_iam_custom_role.TriggerFunction.id
   member = "serviceAccount:${google_service_account.TriggerFunction.email}"
 }
@@ -635,11 +636,13 @@ resource "google_project_iam_custom_role" "TripsDataflow" {
 }
 
 resource "google_project_iam_member" "TripsDataflow_Worker" {
+  project = var.project
   role   = "roles/dataflow.worker"
   member = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
 
 resource "google_project_iam_member" "TripsDataflow" {
+  project = var.project
   role   = google_project_iam_custom_role.TripsDataflow.id
   member = "serviceAccount:${google_service_account.TripsDataflow.email}"
 }
@@ -685,6 +688,7 @@ resource "google_project_iam_custom_role" "CleanupFunction" {
 }
 
 resource "google_project_iam_member" "CleanupFunction" {
+  project = var.project
   role   = google_project_iam_custom_role.CleanupFunction.id
   member = "serviceAccount:${google_service_account.CleanupFunction.email}"
 }
@@ -707,6 +711,7 @@ resource "google_bigquery_table_iam_member" "CleanupFunction_MlDatasetWriter" {
 resource "google_cloudfunctions_function" "TriggerFunction" {
   name                  = "chicago-taxi-trigger-function"
   runtime               = "java11"
+
   available_memory_mb   = 256
   entry_point           = "com.epam.gcp.chicagotaximl.triggerfunction.TriggerFunctionPubSubEvent"
   service_account_email = google_service_account.TriggerFunction.email
@@ -718,7 +723,7 @@ resource "google_cloudfunctions_function" "TriggerFunction" {
   depends_on = [
     google_storage_bucket_object.TriggerFunctionSource
   ]
-  source_archive_bucket = google_storage_bucket_object.TriggerFunctionSource.bucket
+  source_archive_bucket = google_storage_bucket.FunctionsSystemFiles.name
   source_archive_object = google_storage_bucket_object.TriggerFunctionSource.name
   environment_variables = {
     project           = var.project
@@ -748,7 +753,7 @@ resource "google_cloudfunctions_function" "CleanupFunction" {
   depends_on = [
     google_storage_bucket_object.CleanupFunctionSource
   ]
-  source_archive_bucket = google_storage_bucket_object.CleanupFunctionSource.bucket
+  source_archive_bucket = google_storage_bucket.FunctionsSystemFiles.name
   source_archive_object = google_storage_bucket_object.CleanupFunctionSource.name
   environment_variables = {
     dataset  = google_bigquery_dataset.ChicagoTaxi.dataset_id

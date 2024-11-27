@@ -20,12 +20,12 @@ This file defines environments for a TFX taxi pipeline.
 import tfx
 
 PIPELINE_NAME = 'tfx-pipeline-demo1-taxi'
-GOOGLE_CLOUD_PROJECT = 'or2--epm-gcp-by-meetup2-t1iylu'
-GCS_BUCKET_NAME = 'epm-spec-chicago-taxi'
+GOOGLE_CLOUD_PROJECT = 'myproject-311515'
+GCS_BUCKET_NAME = 'taxi-output1'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example.
-DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips_bucket/'
+DATA_PATH = f'gs://{GCS_BUCKET_NAME}/trips'
 
 # Following image will be used to run pipeline components run if Kubeflow
 # Pipelines used.
@@ -90,10 +90,12 @@ GCP_VERTEX_SERVING_ARGS = {
 # TFX pipeline produces many output files and metadata. All output data will be
 # stored under this OUTPUT_DIR.
 OUTPUT_DIR = f'gs://{GCS_BUCKET_NAME}'
+LOCAL_OUTPUT_DIR = "./data"
 
 # TFX produces two types of outputs, files and metadata.
 # - Files will be created under PIPELINE_ROOT directory.
 PIPELINE_ROOT = f'{OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
+LOCAL_PIPELINE_ROOT = f'{LOCAL_OUTPUT_DIR}/tfx_pipeline_output/{PIPELINE_NAME}'
 
 # The last component of the pipeline, "Pusher" will produce serving model under SERVING_MODEL_DIR.
 SERVING_MODEL_DIR = f'{PIPELINE_ROOT}/serving_model'

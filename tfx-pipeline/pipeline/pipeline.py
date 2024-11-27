@@ -87,7 +87,7 @@ def create_pipeline(
         _trainer,
         _model_resolver,
         _evaluator,
-        _pusher
+        # _pusher
     ]
 
     if _transform:
@@ -99,7 +99,6 @@ def create_pipeline(
         pipeline_name=pipeline_name,
         pipeline_root=pipeline_root,
         components=components,
-        # Change this value to control caching of execution results. Default value
-        enable_cache=False,
+        enable_cache=True,
         metadata_connection_config=metadata_connection_config,
     )

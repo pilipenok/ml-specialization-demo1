@@ -1,0 +1,33 @@
+{
+  "evalConfig": {
+    "modelSpecs": [
+      {
+        "labelKey": "trips_bucket_num"
+      }
+    ],
+    "slicingSpecs": [
+      {}
+    ],
+    "metricsSpecs": [
+      {
+        "metrics": [
+          {
+            "className": "RootMeanSquaredError"
+          },
+          {
+            "className": "MeanAbsolutePercentageError"
+          }
+        ],
+        "modelNames": [
+          ""
+        ]
+      }
+    ]
+  },
+  "version": "0.46.0",
+  "dataLocation": "<user provided PCollection>",
+  "fileFormat": "<unknown>",
+  "modelLocations": {
+    "": "gs://taxi-output1/tfx_pipeline_output/tfx-pipeline-demo1-taxi/480104596184/tfx-pipeline-demo1-taxi-20240929114549/TrainerVertex_-2369097432123310080/model/Format-Serving"
+  }
+}

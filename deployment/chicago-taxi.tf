@@ -139,6 +139,7 @@ resource "google_storage_bucket_object" "CleanupFunctionSource" {
 // Topic to execute TriggerFunction from Cloud Scheduler
 resource "google_pubsub_topic" "PipelineTrigger" {
   name = "chicago-taxi-trigger"
+  project = var.project
 }
 
 // Network for Dataflow job

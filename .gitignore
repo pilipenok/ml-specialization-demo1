@@ -6,3 +6,4 @@ tfx_metadata/**
 tfx_pipeline_output/**
 
 tfx-pipeline/sandbox.ipynb
+/deployment/taxi.json

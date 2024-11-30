@@ -26,7 +26,7 @@ Create a zip archive cleanupfunction.zip containing cleanupfunction/pom.xml, cle
 7. Initialize terraform. From the deployment/terraform directory run:  
 terraform init
 
-8. From the deployment/terraform directory run:  
+8. From the deployment directory run:  
    terraform apply -var project=<PROJECT_ID> \
    -var service-account-key-location="<PATH_TO_SERVICE_ACCOUNT_KEY_WITH_OWNER_ROLE>" \
    -var dataflow-system-files-bucket=<DATAFLOW_SYSTEM_FILES_BUCKET> \

@@ -58,3 +58,17 @@ tf-apply:
    -var trigger-function-location=${PATH_TO_TRIGGER_FUNCTION_SOURCE_ZIP_FILE} \
    -var cleanup-function-location=${PATH_TO_CLEANUP_FUNCTION_SOURCE_ZIP_FILE}
 
+dataflow:
+	export JAVA_HOME=$(/usr/libexec/java_home -v 11)
+	cd bqtostoragedataflow && \
+	mvn -Pdataflow-runner clean compile exec:java -Dexec.mainClass=com.epam.gcp.chicagotaximl.dataflow.TripsPublicBqToStorage \
+	-Dexec.cleanupDaemonThreads=false -Dexec.args="\
+	--project=${PROJECT_ID} \
+	--tempLocation=gs://${DATAFLOW_TEMP_FILES_BUCKET}/public-bq-to-csv \
+	--stagingLocation=gs://${DATAFLOW_SYSTEM_FILES_BUCKET}/public-bq-to-csv/staging \
+	--runner=DataflowRunner \
+	--region=us-central1 \
+	--subnetwork=https://www.googleapis.com/compute/v1/projects/${PROJECT_ID}/regions/us-central1/subnetworks/dataflow \
+	--templateLocation=gs://${DATAFLOW_SYSTEM_FILES_BUCKET}/public-bq-to-csv/template \
+	--dataset=${DATASET_NAME} \
+	--outputDirectory=gs://${OUTPUT_BUCKET}/trips"

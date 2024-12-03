@@ -1,8 +1,0 @@
-appengine-python-standard
-
-tensorflow
-tfx[kfp]
-tensorflow-estimator
-keras
-google-cloud-aiplatform
-keras_tuner

@@ -6,7 +6,7 @@ DATAFLOW_TEMP_FILES_BUCKET ?= taxi-dataflow-temp
 FUNCTION_SYSTEM_FILES_BUCKET ?= taxi-function-system
 OUTPUT_BUCKET ?= ml-spec-taxi-output
 DATASET_NAME ?= chicago_taxi_trips
-SOURCE_TABLE_NAME ?= taxi_trips
+SOURCE_TABLE_NAME ?= taxi_trips_view
 PATH_TO_TRIGGER_FUNCTION_SOURCE_ZIP_FILE ?= ./triggerfunction.zip
 PATH_TO_CLEANUP_FUNCTION_SOURCE_ZIP_FILE ?= ./cleanupfunction.zip
 

@@ -20,8 +20,8 @@ This file defines environments for a TFX taxi pipeline.
 import tfx
 
 PIPELINE_NAME = 'tfx-pipeline-demo1-taxi'
-GOOGLE_CLOUD_PROJECT = 'myproject-311515'
-GCS_BUCKET_NAME = 'taxi-output1'
+GOOGLE_CLOUD_PROJECT = 'ml-spec-taxi'
+GCS_BUCKET_NAME = 'ml-spec-taxi-output'
 GOOGLE_CLOUD_REGION = 'us-central1'
 
 # Specifies data file directory. DATA_PATH should be a directory containing CSV files for CsvExampleGen in this example.

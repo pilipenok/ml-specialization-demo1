@@ -10,7 +10,7 @@ package com.epam.gcp.chicagotaximl.triggerfunction;
 
 import com.google.cloud.bigquery.BigQuery;
 import com.google.cloud.bigquery.QueryJobConfiguration;
-import com.google.cloud.bigquery.QueryJobConfiguration.Builder;
+import com.google.cloud.bigquery.QueryJobConfiguratчion.Builder;
 import com.google.cloud.bigquery.TableResult;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.LocalDate;
